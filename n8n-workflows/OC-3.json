@@ -1,0 +1,137 @@
+{
+  "name": "OC-3: TLab Agentic Monitor (Brain)",
+  "nodes": [
+    {
+      "parameters": { "httpMethod": "POST", "path": "prometheus-alerts", "options": {} },
+      "id": "54fe058a-2e6d-4ab9-a0ca-44d851d84d80",
+      "name": "Webhook Prometheus Alert",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [ -64, -96 ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const rawInput = $input.first().json;\nconst alerts = rawInput.body?.alerts || rawInput.alerts || [];\nconst firingAlerts = alerts.filter(a => a.status === 'firing');\nif (firingAlerts.length === 0) {\n  const directTarget = rawInput.body?.target || rawInput.target || rawInput.body?.container || rawInput.container;\n  if (directTarget) return [{ json: { has_alert: true, alerts_count: 1, issues_detail: [{ target: directTarget, alert_name: 'ManualTestAlert', severity: 'warning', summary: 'Manual trigger test alert' }] } }];\n  return []; \n}\nconst alert = firingAlerts[0];\nconst parsedIssue = {\n  target: alert.labels?.container || alert.labels?.instance || alert.labels?.job || 'metabase',\n  alert_name: alert.labels?.alertname || 'ContainerDown',\n  severity: alert.labels?.severity || 'warning',\n  summary: alert.annotations?.summary || alert.annotations?.description || 'Connection issue'\n};\nreturn [{ json: { has_alert: true, alerts_count: 1, issues_detail: [parsedIssue] } }];"
+      },
+      "id": "476b81c6-ae7b-4c63-8664-66adf00e3d1e",
+      "name": "Parse Prometheus Alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [ 160, -96 ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const alertTarget = $('Parse Prometheus Alert').first().json.issues_detail?.[0]?.target || '';\nconst cleanTarget = alertTarget.split(':')[0].toLowerCase();\nconst req = typeof helpers !== 'undefined' ? helpers.httpRequest : $helpers.httpRequest;\n\nconst defaultPveToken = $env.get('PROXMOX_API_TOKEN') || '';\nconst defaultLocalIp = $env.get('N8N_LOCAL_IP') || '192.168.1.41';\n\n// PROXMOX HOSTS LIST\nconst PVE_NODES = [\n  { name: 'pve',  ip: defaultLocalIp, token: defaultPveToken }\n];\nconst DOCKER_HOSTS = [\n  { url: `http://${defaultLocalIp}:2375`, ip: defaultLocalIp, name: 'docker-core' }\n];\n\nconst STATIC_MAPPINGS = {\n  'metabase': { name: 'metabase', type: 'container', action: 'restart', node_ip: defaultLocalIp },\n  'n8n': { name: 'n8n', type: 'container', action: 'restart', node_ip: defaultLocalIp },\n  'adguard': { name: 'adguard', type: 'container', action: 'restart', node_ip: defaultLocalIp },\n  'security-stack': { id: 300, name: 'security-stack', type: 'lxc', action: 'pct_start', node_ip: defaultLocalIp }\n};\n\nlet matchedAsset = null;\nlet searchKey = cleanTarget;\n\nfor (const [key, map] of Object.entries(STATIC_MAPPINGS)) {\n  if (alertTarget.includes(key) || cleanTarget.includes(key)) {\n    if (map.type === 'qemu' || map.type === 'lxc') {\n      matchedAsset = { found_in: 'proxmox', type: map.type, id: map.id, name: map.name, node_ip: map.node_ip, pve_token: PVE_NODES.find(n => n.ip === map.node_ip)?.token || '', recommended_action: map.action, status: 'unknown' };\n      break;\n    } else if (map.type === 'container') {\n      matchedAsset = { found_in: 'docker', type: 'container', id: map.name, name: map.name, node_ip: map.node_ip, recommended_action: map.action, status: 'exited' };\n      break;\n    }\n  }\n}\n\nif (!matchedAsset) {\n  for (const config of PVE_NODES) {\n    try {\n      const pveRes = await req({ method: 'GET', url: `https://${config.ip}:8006/api2/json/cluster/resources`, headers: { 'Authorization': config.token }, skipSslCertificateValidation: true, rejectUnauthorized: false, timeout: 3000, json: true });\n      for (const item of (pveRes.data || [])) {\n        if (item.type !== 'qemu' && item.type !== 'lxc') continue;\n        const name = (item.name || '').toLowerCase();\n        if (searchKey.includes(String(item.vmid)) || name.includes(searchKey) || searchKey.includes(name)) {\n          matchedAsset = { found_in: 'proxmox', type: item.type, id: item.vmid, name: item.name, node_name: item.node || config.name, node_ip: config.ip, pve_token: config.token, recommended_action: item.type === 'lxc' ? 'pct_start' : 'qm_start', status: item.status };\n          break;\n        }\n      }\n    } catch(e) {}\n    if (matchedAsset) break;\n  }\n}\n\nif (!matchedAsset) {\n  for (const dockerHost of DOCKER_HOSTS) {\n    try {\n      const dockerRes = await req({ method: 'GET', url: `${dockerHost.url}/containers/json?all=1`, timeout: 3000, json: true });\n      for (const c of dockerRes) {\n        const names = (c.Names || []).map(n => n.replace('/', '').toLowerCase());\n        if (names.some(n => searchKey.includes(n) || n.includes(searchKey))) {\n          matchedAsset = { found_in: 'docker', type: 'container', id: names[0], name: names[0], node_ip: dockerHost.ip, recommended_action: 'restart', status: c.State };\n          break;\n        }\n      }\n    } catch(e) {}\n    if (matchedAsset) break;\n  }\n}\n\nif (!matchedAsset) {\n  matchedAsset = { found_in: 'docker', type: 'container', id: searchKey, name: searchKey, node_ip: defaultLocalIp, recommended_action: 'restart', status: 'unknown' };\n}\n\nreturn [{ json: { target_raw: alertTarget, asset: matchedAsset } }];"
+      },
+      "id": "214d9282-87a3-470c-b412-160bbf41fea7",
+      "name": "Live Auto-Discovery Agent",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [ 384, -96 ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT issue_type as action, solution, confidence FROM tlab_memory WHERE container = '{{ $json.asset.id || $json.target_raw }}' AND outcome = 'SUCCESS' AND confidence >= 0.90 ORDER BY learned_at DESC LIMIT 1;",
+        "options": {}
+      },
+      "id": "478377a5-772b-403a-a77e-dbbadd211024",
+      "name": "Zero-Token RAG Bypass",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [ 608, -96 ],
+      "alwaysOutputData": true,
+      "credentials": { "postgres": { "id": "KiYa8bAsCxMFKNdd", "name": "PostgreSQL Homelab" } },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const directMem = $input.first()?.json || {};\nconst assetData = $('Live Auto-Discovery Agent').first()?.json || {};\nconst asset = assetData.asset || {};\nlet memAction = directMem.action;\n\nif (asset.type === 'container' && memAction && !['restart', 'start', 'stop'].includes(memAction)) {\n  memAction = 'restart';\n}\nif (directMem && memAction) {\n  return [{ json: {\n    bypass_ai: true,\n    action: memAction,\n    target: asset.name || assetData.target_raw,\n    asset_type: asset.type || 'container',\n    vmid: asset.id || null,\n    node_ip: asset.node_ip || $env.get('N8N_LOCAL_IP'),\n    pve_token: asset.pve_token || '',\n    risk: 'low',\n    reason: \"Recurring incident - 0-Token Recovery via TLab RAG Memory\",\n    command: `docker restart ${asset.name || asset.id}`,\n    proposed_at: new Date().toISOString()\n  } }];\n}\nreturn [{ json: { bypass_ai: false } }];"
+      },
+      "id": "8b94501a-924b-4d30-b804-8da61dc2ffd3",
+      "name": "AI Bypass Evaluator",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [ 832, -96 ]
+    },
+    {
+      "parameters": {
+        "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 1 }, "conditions": [ { "id": "c1", "leftValue": "={{ $json.bypass_ai }}", "rightValue": true, "operator": { "type": "boolean", "operation": "true" } } ], "combinator": "and" },
+        "options": {}
+      },
+      "id": "641c8a55-dce0-4e0b-82fc-287a999e8559",
+      "name": "Activate Bypass?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [ 1056, -96 ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const alertData = $('Parse Prometheus Alert').first().json;\nconst assetData = $('Live Auto-Discovery Agent').first().json;\nconst asset = assetData.asset;\nconst now = new Date().toISOString();\nconst prompt = [\n  '=== SYSTEM ROLE ===',\n  'You are the AI SRE for TLab Monitor. Autonomously diagnose issues based on Live Discovery data and output the JSON recovery command.',\n  '=== PROMETHEUS ALERT ===',\n  JSON.stringify(alertData.issues_detail || [], null, 2),\n  '=== DYNAMIC INFRASTRUCTURE DATA ===',\n  JSON.stringify(asset, null, 2),\n  '=== RULES ===',\n  '1. IF asset.found_in === \"proxmox\": action=\"qm_start\" or \"pct_start\"',\n  '2. IF asset.found_in === \"docker\": action=\"restart\"',\n  '3. Output ONLY a single valid JSON object.',\n  '{',\n  '  \"issues\": [{',\n  '      \"target\": \"' + assetData.target_raw + '\",',\n  '      \"asset_type\": \"' + asset.type + '\",',\n  '      \"vmid\": ' + (asset.id || null) + ',',\n  '      \"node_ip\": \"' + (asset.node_ip || $env.get('N8N_LOCAL_IP')) + '\",',\n  '      \"pve_token\": \"' + (asset.pve_token || '') + '\",',\n  '      \"root_cause\": \"Root cause\",',\n  '      \"tier\": \"approve\",',\n  '      \"confidence\": 0.95,',\n  '      \"action\": \"' + asset.recommended_action + '\",',\n  '      \"reason\": \"Reason\"',\n  '  }]',\n  '}'\n].join('\\n');\nreturn [{ json: { prompt, asset } }];"
+      },
+      "id": "9d0b49f3-513d-412d-86e6-888782361d12",
+      "name": "Build Reasoning Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [ 1280, 32 ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "Content-Type", "value": "application/json" }, { "name": "Authorization", "value": "={{ 'Bearer ' + $env[\"OPENROUTER_API_KEY\"] }}" } ] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'inclusionai/ling-3.0-flash:free', messages: [{ role: 'user', content: $json.prompt }], reasoning: { enabled: false }, max_tokens: 2048, temperature: 0.1 }) }}",
+        "options": {}
+      },
+      "id": "a584b881-37dc-4501-8ba5-d8c7d7e86fdd",
+      "name": "Call Ling-3.0 AI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [ 1504, 32 ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const openrouterData = $('Call Ling-3.0 AI').first().json;\nconst choice = openrouterData.choices?.[0];\nif (choice?.finish_reason === 'length') return [{ json: { has_alert: false, summary: \"⚠️ AI Token Overflow!\" } }];\nconst rawText = choice?.message?.content || '{}';\nlet cleanText = rawText;\nconst firstBrace = rawText.indexOf('{');\nconst lastBrace = rawText.lastIndexOf('}');\nif (firstBrace !== -1 && lastBrace !== -1) cleanText = rawText.substring(firstBrace, lastBrace + 1);\nlet analysis;\ntry { analysis = JSON.parse(cleanText); } catch(e) { return [{ json: { has_alert: false, summary: \"JSON Parse Error\" } }]; }\nlet issues = analysis.issues || [];\nif (!issues.length) return [{ json: { has_alert: false, summary: \"Normal\" } }];\nconst topIssue = issues[0];\nconst asset = $('Build Reasoning Prompt').first().json.asset;\nlet finalAction = topIssue.action || asset.recommended_action || 'restart';\nif (asset.type === 'container' && !['restart', 'start', 'stop'].includes(finalAction)) finalAction = 'restart';\nreturn [{ json: {\n  has_alert: true,\n  action: finalAction,\n  target: asset.name || topIssue.target,\n  asset_type: asset.type || 'container',\n  vmid: asset.id || null,\n  node_ip: asset.node_ip || $env.get('N8N_LOCAL_IP'),\n  pve_token: topIssue.pve_token || asset.pve_token || '',\n  risk: (topIssue.tier === 'auto') ? 'low' : 'high',\n  reason: topIssue.reason || topIssue.root_cause || 'Service recovery for container',\n  command: `docker restart ${asset.name}`,\n  proposed_at: new Date().toISOString()\n} }];"
+      },
+      "id": "28b26dd9-2100-44fd-a4e4-7fd45ab61cdd",
+      "name": "Parse AI JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [ 1728, 32 ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'http://' + $env[\"N8N_LOCAL_IP\"] + ':5678/webhook/tlab-propose' }}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "Content-Type", "value": "application/json" } ] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ action: $json.action, target: $json.target, asset_type: $json.asset_type, vmid: $json.vmid, node_ip: $json.node_ip, pve_token: $json.pve_token, risk: $json.risk, reason: $json.reason, command: $json.command, proposed_at: $json.proposed_at }) }}",
+        "options": {}
+      },
+      "id": "3602f099-7917-4863-9b33-278467da7c58",
+      "name": "Send Proposal to OC-1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [ 2176, -96 ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook Prometheus Alert": { "main": [ [ { "node": "Parse Prometheus Alert", "type": "main", "index": 0 } ] ] },
+    "Parse Prometheus Alert": { "main": [ [ { "node": "Live Auto-Discovery Agent", "type": "main", "index": 0 } ] ] },
+    "Live Auto-Discovery Agent": { "main": [ [ { "node": "Zero-Token RAG Bypass", "type": "main", "index": 0 } ] ] },
+    "Zero-Token RAG Bypass": { "main": [ [ { "node": "AI Bypass Evaluator", "type": "main", "index": 0 } ] ] },
+    "AI Bypass Evaluator": { "main": [ [ { "node": "Activate Bypass?", "type": "main", "index": 0 } ] ] },
+    "Activate Bypass?": { "main": [ [ { "node": "Send Proposal to OC-1", "type": "main", "index": 0 } ], [ { "node": "Build Reasoning Prompt", "type": "main", "index": 0 } ] ] },
+    "Build Reasoning Prompt": { "main": [ [ { "node": "Call Ling-3.0 AI", "type": "main", "index": 0 } ] ] },
+    "Call Ling-3.0 AI": { "main": [ [ { "node": "Parse AI JSON", "type": "main", "index": 0 } ] ] },
+    "Parse AI JSON": { "main": [ [ { "node": "Send Proposal to OC-1", "type": "main", "index": 0 } ] ] }
+  },
+  "active": true,
+  "settings": { "executionOrder": "v1" }
+}

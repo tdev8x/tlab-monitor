@@ -1,0 +1,23 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  group_by: ['alertname', 'instance', 'container'] 
+  group_wait: 30s
+  group_interval: 1m
+  repeat_interval: 1h
+  receiver: 'n8n-webhook'
+
+receivers:
+  - name: 'n8n-webhook'
+    webhook_configs:
+      # Người dùng thay <N8N_LOCAL_IP> bằng IP của máy chủ chạy n8n
+      - url: 'http://<N8N_LOCAL_IP>:5678/webhook/prometheus-alerts'
+        send_resolved: false
+
+inhibit_rules:
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['instance']

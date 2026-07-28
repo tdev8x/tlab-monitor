@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TLab Monitor SRE - Technical Specification v1.1.0</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--p:#1a1a2e;--a:#e94560;--a2:#0f3460;--bg:#fff;--sf:#f8f9fc;--bd:#e2e8f0;--tx:#1e293b;--mu:#64748b;--cb:#0f172a;--ct:#a5f3fc;--ok:#10b981;--wn:#f59e0b;--er:#ef4444;--in:#3b82f6}
+body{font-family:'Inter',sans-serif;font-size:15px;line-height:1.8;color:var(--tx);background:var(--bg)}
+.cover{min-height:100vh;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 45%,#0f3460 100%);display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:60px 40px;page-break-after:always;position:relative;overflow:hidden}
+.cover::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 25% 35%,rgba(233,69,96,.18) 0%,transparent 55%),radial-gradient(circle at 75% 65%,rgba(59,130,246,.15) 0%,transparent 55%)}
+.cv{position:relative;z-index:1;max-width:800px}
+.badge{display:inline-block;background:rgba(233,69,96,.18);border:1px solid rgba(233,69,96,.45);color:#e94560;padding:8px 24px;border-radius:20px;font-size:12px;font-weight:600;letter-spacing:2px;text-transform:uppercase;margin-bottom:32px}
+.cover h1{font-size:52px;font-weight:700;color:#fff;line-height:1.2;letter-spacing:-1.5px;margin-bottom:12px}
+.cover h1 em{color:#e94560;font-style:normal}
+.cover h2{font-size:20px;font-weight:300;color:rgba(255,255,255,.55);margin-bottom:20px}
+.div{width:64px;height:4px;background:linear-gradient(90deg,#e94560,#3b82f6);margin:28px auto;border-radius:2px}
+.cv-desc{font-size:16px;color:rgba(255,255,255,.6);max-width:600px;margin:0 auto 40px;line-height:1.7}
+.meta-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:40px;text-align:left}
+.meta-item{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:16px 20px}
+.meta-item .ml{font-size:10px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px}
+.meta-item .mv{font-size:14px;color:rgba(255,255,255,.9);font-weight:500}
+.tags{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+.tag{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);color:rgba(255,255,255,.7);padding:6px 14px;border-radius:6px;font-size:13px;font-family:'JetBrains Mono',monospace}
+.cv-footer{margin-top:50px;font-size:12px;color:rgba(255,255,255,.3);letter-spacing:1.5px;text-transform:uppercase}
+.wrap{max-width:1000px;margin:0 auto;padding:64px 40px}
+.toc{background:var(--sf);border:1px solid var(--bd);border-radius:14px;padding:40px;margin-bottom:64px;page-break-after:always}
+.toc-h{font-size:22px;font-weight:700;color:var(--p);padding-bottom:16px;border-bottom:2px solid var(--a);margin-bottom:28px}
+.toc-list{list-style:none}
+.toc-list li{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px dashed var(--bd)}
+.toc-list li:last-child{border:none}
+.toc-list li a{color:var(--tx);text-decoration:none;font-size:15px;font-weight:500;transition:.2s}
+.toc-list li a:hover{color:var(--a)}
+.toc-sub{padding-left:26px!important}
+.toc-sub a{font-size:14px!important;color:var(--mu)!important;font-weight:400!important}
+.toc-pg{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--mu)}
+.sec{margin-bottom:80px}
+.pb{page-break-before:always}
+.sec-hdr{display:flex;align-items:center;gap:16px;margin-bottom:32px;padding-bottom:16px;border-bottom:2px solid var(--bd)}
+.sec-num{background:var(--a);color:#fff;min-width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700}
+.sec-title{font-size:26px;font-weight:700;color:var(--p)}
+.sec-sub{display:block;font-size:13px;font-weight:400;color:var(--mu);text-transform:uppercase;letter-spacing:1.2px;margin-top:4px}
+h3{font-size:18px;font-weight:600;color:var(--a2);margin:32px 0 16px;padding-left:14px;border-left:4px solid var(--a)}
+h4{font-size:14px;font-weight:700;color:var(--mu);margin:20px 0 12px;text-transform:uppercase;letter-spacing:1px}
+p{margin-bottom:16px}
+ul,ol{padding-left:26px;margin-bottom:16px}
+li{margin-bottom:8px}
+strong{font-weight:600}
+.diagram-container { background: var(--cb); padding: 40px; border-radius: 12px; margin: 24px 0; border: 1px solid rgba(255,255,255,0.1); display: flex; flex-direction: column; align-items: center; gap: 20px; overflow-x: auto; }
+.diag-row { display: flex; gap: 30px; justify-content: center; width: 100%; align-items: center; flex-wrap: wrap; }
+.diag-box { background: var(--sf); border: 2px solid var(--bd); padding: 18px 24px; border-radius: 10px; text-align: center; font-weight: 600; font-size: 14px; min-width: 220px; position: relative; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 2; }
+.diag-box.brain { border-color: #a5f3fc; background: linear-gradient(135deg,#1a1a2e,#0f3460); color: #fff; }
+.diag-box.shield { border-color: #f59e0b; background: linear-gradient(135deg,#1c1917,#44403c); color: #fff; }
+.diag-box.hand { border-color: #10b981; background: linear-gradient(135deg,#064e3b,#065f46); color: #fff; }
+.diag-box.db { border-color: #8b5cf6; background: linear-gradient(135deg,#1e1b4b,#312e81); color: #fff; }
+.diag-box.external { border-color: #e94560; color: #fff; background: transparent; border-style: dashed; }
+.diag-box span { display: block; font-size: 12px; font-weight: 400; margin-top: 8px; opacity: 0.85; line-height: 1.5; }
+.diag-arrow { width: 3px; height: 30px; background: var(--a); position: relative; margin: 0 auto; }
+.diag-arrow::after { content: ''; position: absolute; bottom: -6px; left: -5px; border-width: 7px 6px 0 6px; border-style: solid; border-color: var(--a) transparent transparent transparent; }
+.diag-arrow-right { width: 40px; height: 3px; background: var(--a); position: relative; }
+.diag-arrow-right::after { content: ''; position: absolute; right: -6px; top: -5px; border-width: 6px 0 6px 7px; border-style: solid; border-color: transparent transparent transparent var(--a); }
+table{width:100%;border-collapse:collapse;margin:18px 0;font-size:14px;border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+thead tr{background:var(--p)}
+thead th{color:#fff;padding:14px 20px;text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:1px;font-weight:600}
+tbody tr{border-bottom:1px solid var(--bd)}
+tbody tr:nth-child(even){background:var(--sf)}
+tbody td{padding:12px 20px;vertical-align:top}
+.note{border-radius:10px;padding:18px 24px;margin:20px 0;border-left:5px solid;display:flex;gap:16px;align-items:flex-start}
+.note .ni{font-size:22px;flex-shrink:0}
+.note .nt strong{display:block;font-weight:600;font-size:15px;margin-bottom:6px}
+.note .nt p{font-size:14px;margin:0;line-height:1.7}
+.note.info{background:#eff6ff;border-color:var(--in);color:#1e40af}
+.note.warn{background:#fffbeb;border-color:var(--wn);color:#92400e}
+.mc{border:1px solid var(--bd);border-radius:14px;overflow:hidden;margin-bottom:32px; box-shadow: 0 4px 12px rgba(0,0,0,0.04);}
+.mc-hdr{padding:20px 28px;display:flex;align-items:center;gap:18px}
+.mc-hdr.brain{background:linear-gradient(135deg,#1a1a2e,#0f3460)}
+.mc-hdr.shield{background:linear-gradient(135deg,#1c1917,#44403c)}
+.mc-hdr.hand{background:linear-gradient(135deg,#064e3b,#065f46)}
+.mc-hdr.storage{background:linear-gradient(135deg,#1e1b4b,#312e81)}
+.mc-icon{width:56px;height:56px;border-radius:12px;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;font-size:28px}
+.mc-info h3{color:#fff;font-size:20px;margin:0 0 6px;border:none;padding:0}
+.mc-info p{color:rgba(255,255,255,.6);font-size:12px;margin:0;text-transform:uppercase;letter-spacing:1px}
+.mc-body{padding:26px 28px}
+.db-card{border:1px solid var(--bd);border-radius:12px;overflow:hidden;margin:20px 0; box-shadow: 0 4px 12px rgba(0,0,0,0.03);}
+.db-hdr{background:var(--p);padding:14px 22px;display:flex;justify-content:space-between;align-items:center}
+.db-hdr span{font-family:'JetBrains Mono',monospace;font-size:15px;color:#fff;font-weight:600}
+.db-hdr small{font-size:12px;color:rgba(255,255,255,.4)}
+.db-row{display:grid;grid-template-columns:180px 140px 1fr 90px;border-bottom:1px solid var(--bd)}
+.db-row:last-child{border:none}
+.db-row.h{background:var(--sf);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--mu)}
+.db-cell{padding:12px 18px;font-size:13px;border-right:1px solid var(--bd)}
+.db-cell:last-child{border:none}
+.kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin:24px 0}
+.kpi-c{background:var(--sf);border:1px solid var(--bd);border-radius:12px;padding:24px 20px;text-align:center; box-shadow: 0 4px 10px rgba(0,0,0,0.03);}
+.kpi-c .kv{font-size:36px;font-weight:700;color:var(--a);line-height:1}
+.kpi-c .kl{font-size:13px;color:var(--mu);margin-top:10px;text-transform:uppercase;letter-spacing:1px}
+@media print{
+  .cover, .mc-hdr, .diag-box, .diagram-container {-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div class="cv">
+    <div class="badge">Technical Specification Document</div>
+    <h1>TLab Monitor <em>SRE</em></h1>
+    <h2>AI-Driven Homelab Monitoring &amp; Self-Healing System</h2>
+    <div class="div"></div>
+    <p class="cv-desc">
+      A comprehensive technical specification document for the open-source community, operations engineers, and developers regarding the automated infrastructure monitoring system, integrated with intelligent AI processing.
+    </p>
+    <div class="meta-grid">
+      <div class="meta-item"><div class="ml">Version</div><div class="mv">v1.1.0 — Open Source</div></div>
+      <div class="meta-item"><div class="ml">Last Updated</div><div class="mv">July 27, 2026</div></div>
+      <div class="meta-item"><div class="ml">Classification</div><div class="mv">Public Repository</div></div>
+      <div class="meta-item"><div class="ml">Core Engine</div><div class="mv">n8n Automation Engine</div></div>
+      <div class="meta-item"><div class="ml">AI Model</div><div class="mv">OpenRouter LLM API</div></div>
+      <div class="meta-item"><div class="ml">Status</div><div class="mv">✅ Ready for Deployment</div></div>
+    </div>
+    <div class="tags">
+      <span class="tag">n8n (Dynamic Map)</span>
+      <span class="tag">Proxmox VE</span>
+      <span class="tag">Docker Socket</span>
+      <span class="tag">PostgreSQL RAG</span>
+      <span class="tag">Prometheus</span>
+      <span class="tag">Ntfy</span>
+      <span class="tag">LLM Reasoning</span>
+    </div>
+    <div class="cv-footer">TLab Monitor SRE &nbsp;·&nbsp; Advanced AI Architecture</div>
+  </div>
+</div>
+
+<div class="wrap">
+<div class="toc">
+  <div class="toc-h">📋 Table of Contents</div>
+  <ul class="toc-list">
+    <li><a href="#s1">1. System Overview</a><span class="toc-pg">§1</span></li>
+    <li class="toc-sub"><a href="#s1-1">1.1 Description & Design Goals</a></li>
+    <li class="toc-sub"><a href="#s1-2">1.2 Purpose & Roles of Core Components</a></li>
+    <li><a href="#s2">2. Overall Architecture</a><span class="toc-pg">§2</span></li>
+    <li class="toc-sub"><a href="#s2-1">2.1 Network Topology</a></li>
+    <li class="toc-sub"><a href="#s2-2">2.2 Module Relationships</a></li>
+    <li class="toc-sub"><a href="#s2-3">2.3 End-to-End Data Flow Diagram</a></li>
+    <li><a href="#s3">3. Detailed Module Specifications</a><span class="toc-pg">§3</span></li>
+    <li class="toc-sub"><a href="#s3-1">3.1 OC-3: Agentic Monitor — Brain</a></li>
+    <li class="toc-sub"><a href="#s3-2">3.2 OC-1: Decision & Guardrail — Shield</a></li>
+    <li class="toc-sub"><a href="#s3-3">3.3 OC-2: Multi-Executor & Verification — Hand</a></li>
+    <li class="toc-sub"><a href="#s3-4">3.4 OC-4: DB Helper & RAG Memory — Storage</a></li>
+    <li><a href="#s4">4. PostgreSQL Database Schema</a><span class="toc-pg">§4</span></li>
+    <li><a href="#s5">5. Safety Mechanisms & Guardrails</a><span class="toc-pg">§5</span></li>
+    <li><a href="#s8">6. Key Performance Indicators (KPIs)</a><span class="toc-pg">§6</span></li>
+    <li><a href="#s9">7. Development Roadmap</a><span class="toc-pg">§7</span></li>
+  </ul>
+</div>
+
+<div class="sec" id="s1">
+  <div class="sec-hdr">
+    <div class="sec-num">1</div>
+    <div class="sec-title">System Overview<span>General Architecture & Purpose</span></div>
+  </div>
+
+  <h3 id="s1-1">1.1 Description & Design Goals</h3>
+  <p><strong>TLab Monitor SRE</strong> is a next-generation self-hosted infrastructure monitoring and auto-healing system. Built on the <code>n8n</code> platform, the system deeply integrates an Agentic AI model capable of dynamically discovering resources, reasoning about incident root causes, and independently issuing recovery commands without hardcoding network parameters.</p>
+  <p>This open-source architecture update has entirely eliminated static IP configurations. Instead, the AI dynamically queries and injects variables (IPs, Tokens) via static mappings mapped to Environment Variables, allowing precise interaction with Docker Hosts, QEMUs, and LXCs on Proxmox.</p>
+
+  <table>
+    <thead><tr><th>Core Goal</th><th>Technical Solution</th><th>Impact</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Automated Infrastructure Discovery</strong></td><td>The <em>Live Auto-Discovery Agent</em> node injects IPs/Tokens corresponding to the failing asset.</td><td>No manual IP hardcoding required.</td></tr>
+      <tr><td><strong>AI Token Efficiency</strong></td><td>Queries RAG (Memory) to retrieve past solutions rather than calling LLMs for recurring errors.</td><td>Drastically reduces latency and API costs.</td></tr>
+      <tr><td><strong>Crash Loop Protection</strong></td><td>Auto-locks execution if an application crashes >= 1 time within 10 minutes.</td><td>Prevents disk/filesystem corruption due to boot loops.</td></tr>
+      <tr><td><strong>Data Sanitization</strong></td><td>Regex sanitization function strips extraneous <code>=</code> characters caused by n8n JSON routing bugs.</td><td>Eliminates routing breakdown incidents.</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="s1-2">1.2 Purpose & Roles of Core Components</h3>
+  <p>The system is designed to solve end-to-end automation in server cluster management, targeting specific technologies:</p>
+  <ul>
+    <li><strong>For Docker (Container Management):</strong> When a container hangs, exhausts RAM (OOM), or stops unexpectedly, Prometheus triggers an alert. TLab Monitor automatically resolves the structure and calls the <em>Docker Socket API</em> to Restart/Start the container without manual intervention.</li>
+    <li><strong>For Proxmox VE (PVE - Virtualization):</strong> Detects downed VMs (QEMU) or LXCs. It pairs the secure <em>Proxmox API Token</em> and routes REST API calls to the correct physical Node to wake up the respective VM.</li>
+    <li><strong>For Agentic AI:</strong> Acts as a "24/7 Online SRE Engineer". Upon receiving metrics, the AI analyzes whether it's normal behavior (e.g., Camera system spiking CPU on motion) or a real incident. It then decides to: Ignore, Auto-Fix, or Escalate.</li>
+    <li><strong>For Ntfy (Human-in-the-Loop):</strong> Creates a secure checkpoint on mobile devices. For high-risk commands impacting core infrastructure, it pushes a notification with interactive buttons (Approve / Reject). The AI is only permitted to execute upon human confirmation.</li>
+  </ul>
+</div>
+
+<div class="sec pb" id="s2">
+  <div class="sec-hdr">
+    <div class="sec-num">2</div>
+    <div class="sec-title">Overall Architecture<span>Architecture & System Design</span></div>
+  </div>
+
+  <h3 id="s2-1">2.1 Network Topology</h3>
+  <div class="diagram-container">
+    <div class="diag-row">
+      <div class="diag-box external">🌐 External Network Access<br><span>Cloudflare Tunnel / Reverse Proxy</span></div>
+    </div>
+    <div class="diag-arrow"></div>
+    <div class="diag-row">
+      <div class="diag-box brain" style="background:var(--sf); color:var(--tx); border-color:var(--mu);">
+        💻 Central Control Layer (Core LAN)<br>
+        <span style="color:var(--tx)"><strong>n8n</strong> (:5678) &nbsp;•&nbsp; <strong>PostgreSQL</strong> (:5432) &nbsp;•&nbsp; <strong>Ntfy</strong> (:80)</span>
+      </div>
+    </div>
+    <div class="diag-arrow"></div>
+    <div class="diag-row" style="flex-wrap: wrap;">
+      <div class="diag-box hand">
+        🐳 Compute: Docker Hosts<br>
+        <span>Expose: Docker Socket Proxy (Port: 2375)</span>
+      </div>
+      <div class="diag-box db">
+        🖥️ Compute: Proxmox VE<br>
+        <span>Expose: Proxmox API (Port: 8006 / QEMU / LXC)</span>
+      </div>
+    </div>
+  </div>
+
+  <h3 id="s2-2">2.2 Module Relationships</h3>
+  <div class="diagram-container">
+    <div class="diag-row">
+      <div class="diag-box external">1. Alerting (Prometheus/Alertmanager)<br><span>POST /webhook/prometheus-alerts</span></div>
+    </div>
+    <div class="diag-arrow"></div>
+    <div class="diag-row">
+      <div class="diag-box brain">2. The Brain (OC-3)<br><span>Dynamic IP Discovery & AI Reasoning</span></div>
+    </div>
+    <div class="diag-arrow"></div>
+    <div class="diag-row">
+      <div class="diag-box shield">3. Shield / Router (OC-1)<br><span>Crash Loop Guard & Approval</span></div>
+      <div class="diag-arrow-right"></div>
+      <div class="diag-box db">Storage (OC-4)<br><span>Audit Trail & AI Memory (RAG)</span></div>
+    </div>
+    <div class="diag-arrow"></div>
+    <div class="diag-row">
+      <div class="diag-box hand">4. The Hand (OC-2)<br><span>API Routing (Docker/PVE) & 10s Verification</span></div>
+    </div>
+  </div>
+
+  <h3 id="s2-3">2.3 End-to-End Data Flow Diagram</h3>
+  <div class="diagram-container">
+    <div class="diag-row">
+      <div class="diag-box" style="border-color: #3b82f6;"><strong>Alert Triggered</strong><br><span>Service Down / Overloaded</span></div>
+      <div class="diag-arrow-right"></div>
+      <div class="diag-box brain"><strong>Discovery & Inject</strong><br><span>Retrieve Dynamic Vars from .env</span></div>
+      <div class="diag-arrow-right"></div>
+      <div class="diag-box db"><strong>Memory Check</strong><br><span>Hit RAG (Bypass AI) / Call OpenRouter</span></div>
+    </div>
+    <div class="diag-arrow"></div>
+    <div class="diag-row">
+      <div class="diag-box shield"><strong>Guardrail Check</strong><br><span>Check Circuit Breaker (Crash Loop)</span></div>
+      <div class="diag-arrow-right"></div>
+      <div class="diag-box external" style="border-style: solid;"><strong>Ntfy Decision</strong><br><span>Auto Approve / Await Engineer</span></div>
+      <div class="diag-arrow-right"></div>
+      <div class="diag-box hand"><strong>Execution</strong><br><span>Dispatch REST/Socket Command</span></div>
+    </div>
+    <div class="diag-arrow"></div>
+    <div class="diag-row">
+      <div class="diag-box" style="border-color:var(--ok);"><strong>Health Check</strong><br><span>Wait 10s & Verify Signal</span></div>
+      <div class="diag-arrow-right"></div>
+      <div class="diag-box db"><strong>RAG Update</strong><br><span>Save solution to tlab_memory</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="sec pb" id="s3">
+  <div class="sec-hdr">
+    <div class="sec-num">3</div>
+    <div class="sec-title">Detailed Module Specifications<span>Workflow Details</span></div>
+  </div>
+
+  <h3 id="s3-1">3.1 OC-3 — Agentic Monitor (The Brain)</h3>
+  <div class="mc">
+    <div class="mc-hdr brain">
+      <div class="mc-icon">🧠</div>
+      <div class="mc-info">
+        <h3>OC-3: Agentic Monitor</h3>
+        <p>Dynamic Injection · Zero-Token RAG · AI Reasoning</p>
+      </div>
+    </div>
+    <div class="mc-body">
+      <p>OC-3 represents the pinnacle of automation. Upon receiving an alert, the AI does not process "blind" strings. Instead, the <strong>Live Auto-Discovery Agent</strong> fetches the service name and reads <code>$env</code> variables to query Proxmox/Docker APIs in real-time.</p>
+      <p>Once located (e.g., a service at <code>192.168.x.x</code> of type `container`), it injects precise parameters into the Payload. The RAG Memory system is then evaluated; if the confidence of a past solution exceeds 0.90, the AI delegates the fix to its "memory," saving 100% of tokens. Otherwise, OpenRouter AI takes over the analysis.</p>
+    </div>
+  </div>
+
+  <h3 id="s3-2">3.2 OC-1 — Decision Tiering & Guardrail (The Shield)</h3>
+  <div class="mc">
+    <div class="mc-hdr shield">
+      <div class="mc-icon">🛡️</div>
+      <div class="mc-info">
+        <h3>OC-1: Decision & Guardrail</h3>
+        <p>Anti Crash Loop · JSON Integrity</p>
+      </div>
+    </div>
+    <div class="mc-body">
+      <p>OC-1 halts the consequences of continuous reboot loops. Using a SQL <code>COUNT(*)</code> command, it counts alerts within a 10-minute window. If a Container or VM crashes ≥ 1 time in that cycle, the circuit breaker automatically trips, firing a CRITICAL notification via Ntfy to summon human help.</p>
+      <p>Furthermore, to maintain data integrity passing to the executor, OC-1 strictly wraps variables in <code>JSON.stringify</code>, entirely ending object formatting errors that previously crashed n8n workflows.</p>
+    </div>
+  </div>
+
+  <h3 id="s3-3">3.3 OC-2 — Multi-Executor & Verification (The Hand)</h3>
+  <div class="mc">
+    <div class="mc-hdr hand">
+      <div class="mc-icon">🤖</div>
+      <div class="mc-info">
+        <h3>OC-2: Multi-Executor & Verification</h3>
+        <p>Smart Sanitization · Dynamic Routing API</p>
+      </div>
+    </div>
+    <div class="mc-body">
+      <p>Static IP addresses have been completely purged from this module. Relying on metadata provided by OC-3, the execution node automatically issues HTTP Requests to the correct target environment (<code>http://${node_ip}:2375...</code>) accurately.</p>
+      <p>The <strong>Clean Input</strong> node acts as a final filter, employing a Regex <code>replace(/^=/, '')</code> to sweep invisible junk characters generated during data transit before the Switch branches out the task.</p>
+    </div>
+  </div>
+
+  <h3 id="s3-4">3.4 OC-4 — DB Helper & RAG Memory (The Storage)</h3>
+  <div class="mc">
+    <div class="mc-hdr storage">
+      <div class="mc-icon">🗄️</div>
+      <div class="mc-info">
+        <h3>OC-4: DB Helper</h3>
+        <p>Memory Access · Event Processing</p>
+      </div>
+    </div>
+    <div class="mc-body">
+      <p>Manages rapid retrieval via internal Webhooks. It enables the system to store resource states (CPU, Memory) in the <code>tlab_events</code> table, export a report of the last 20 Audit actions, and fetch the most successful remediation lessons for the AI's reference.</p>
+    </div>
+  </div>
+</div>
+
+<div class="sec pb" id="s4">
+  <div class="sec-hdr">
+    <div class="sec-num">4</div>
+    <div class="sec-title">PostgreSQL Database Schema<span>Data Architecture</span></div>
+  </div>
+  <p>Three core tables construct the AI's memory. Table names are standardized under the TLab Monitor convention.</p>
+
+  <div class="diagram-container" style="flex-direction:row; align-items:flex-start;">
+    <div class="diag-box db" style="flex:1;">
+      <strong>tlab_audit</strong>
+      <div style="text-align:left; margin-top:14px; font-size:13px; line-height: 1.8;">
+        • execution_id<br>• action<br>• target<br>• reason<br>• decision<br>• result
+      </div>
+    </div>
+    <div class="diag-box db" style="flex:1;">
+      <strong>tlab_memory</strong>
+      <div style="text-align:left; margin-top:14px; font-size:13px; line-height: 1.8;">
+        • container<br>• issue_type<br>• root_cause<br>• solution<br>• outcome<br>• confidence
+      </div>
+    </div>
+    <div class="diag-box db" style="flex:1;">
+      <strong>tlab_events</strong>
+      <div style="text-align:left; margin-top:14px; font-size:13px; line-height: 1.8;">
+        • container<br>• metric_type<br>• metric_value<br>• recorded_at
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="sec pb" id="s5">
+  <div class="sec-hdr">
+    <div class="sec-num">5</div>
+    <div class="sec-title">Safety Mechanisms & Guardrails<span>System Protection</span></div>
+  </div>
+
+  <div class="note warn">
+    <div class="ni">⚠️</div>
+    <div class="nt">
+      <strong>Resolving the n8n "JSON Render Bug"</strong>
+      <p>The JSON transit error that caused incorrect Object formatting has been permanently resolved using a Wrap & Lock method:
+      <br>1. In OC-1: Use <code>JSON.stringify(...)</code> to wrap the entire outgoing Payload.
+      <br>2. In OC-2: Utilize the <strong>Clean Input</strong> Code Node with a Regex to strip invisible `=` characters.</p>
+    </div>
+  </div>
+
+  <div class="note info">
+    <div class="ni">📌</div>
+    <div class="nt">
+      <strong>AI Hallucination Guard</strong>
+      <p>The system does not grant blind control to the LLM. In the Parse AI JSON module, a hardcoded rule enforces: If the located asset is a container, the execution command is statically overridden to <code>restart</code>, completely blocking the AI from inventing destructive OS-level commands.</p>
+    </div>
+  </div>
+</div>
+
+<div class="sec pb" id="s8">
+  <div class="sec-hdr">
+    <div class="sec-num">6</div>
+    <div class="sec-title">Key Performance Indicators<span>KPIs</span></div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-c">
+      <div class="kv">100%</div>
+      <div class="kl">API/Token security via .env</div>
+    </div>
+    <div class="kpi-c">
+      <div class="kv">&lt; 3m</div>
+      <div class="kl">Average Recovery Time</div>
+    </div>
+    <div class="kpi-c">
+      <div class="kv">Active</div>
+      <div class="kl">Crash Loop Guard Mechanism</div>
+    </div>
+  </div>
+
+  <h3 id="s9" style="margin-top: 50px;">7. Future Development Roadmap</h3>
+  <table>
+    <thead><tr><th>Future Release</th><th>Expansion Roadmap Description</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Smart Executor (Multi-step)</strong></td>
+        <td>Add sequential planning capability: Auto-extract Logs → Send to AI for deep diagnosis → Fix internal configs → Restart.</td>
+      </tr>
+      <tr>
+        <td><strong>Predictive Alerting</strong></td>
+        <td>Apply time-series analysis algorithms to the <code>tlab_events</code> table to predict OOM (Out of Memory) crashes 30 minutes in advance.</td>
+      </tr>
+      <tr>
+        <td><strong>Auto Playbook Generator</strong></td>
+        <td>After an incident is mitigated, the AI will automatically generate a Runbook document in Markdown format, archiving it for the engineering team.</td>
+      </tr>
+    </tbody>
+  </table>
+  
+  <br>
+  <div style="text-align:center; color: var(--mu); font-size: 13px; margin-top: 50px; border-top: 1px dashed var(--bd); padding-top: 24px;">
+    <i>— End of Technical Document —<br>TLab Monitor SRE Architecture Design © 2026</i>
+  </div>
+</div>
+</div>
+</body>
+</html>

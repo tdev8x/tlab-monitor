@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>TLab Monitor SRE - Technical Specification v1.1.0</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--p:#1a1a2e;--a:#e94560;--a2:#0f3460;--bg:#fff;--sf:#f8f9fc;--bd:#e2e8f0;--tx:#1e293b;--mu:#64748b;--cb:#0f172a;--ct:#a5f3fc;--ok:#10b981;--wn:#f59e0b;--er:#ef4444;--in:#3b82f6}
+
+/* TĂNG KÍCH THƯỚC CHỮ TỔNG THỂ */
+body{font-family:'Inter',sans-serif;font-size:15px;line-height:1.8;color:var(--tx);background:var(--bg)}
+
+/* COVER */
+.cover{min-height:100vh;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 45%,#0f3460 100%);display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:60px 40px;page-break-after:always;position:relative;overflow:hidden}
+.cover::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 25% 35%,rgba(233,69,96,.18) 0%,transparent 55%),radial-gradient(circle at 75% 65%,rgba(59,130,246,.15) 0%,transparent 55%)}
+.cv{position:relative;z-index:1;max-width:800px}
+.badge{display:inline-block;background:rgba(233,69,96,.18);border:1px solid rgba(233,69,96,.45);color:#e94560;padding:8px 24px;border-radius:20px;font-size:12px;font-weight:600;letter-spacing:2px;text-transform:uppercase;margin-bottom:32px}
+.cover h1{font-size:52px;font-weight:700;color:#fff;line-height:1.2;letter-spacing:-1.5px;margin-bottom:12px}
+.cover h1 em{color:#e94560;font-style:normal}
+.cover h2{font-size:20px;font-weight:300;color:rgba(255,255,255,.55);margin-bottom:20px}
+.div{width:64px;height:4px;background:linear-gradient(90deg,#e94560,#3b82f6);margin:28px auto;border-radius:2px}
+.cv-desc{font-size:16px;color:rgba(255,255,255,.6);max-width:600px;margin:0 auto 40px;line-height:1.7}
+.meta-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:40px;text-align:left}
+.meta-item{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:16px 20px}
+.meta-item .ml{font-size:10px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px}
+.meta-item .mv{font-size:14px;color:rgba(255,255,255,.9);font-weight:500}
+.tags{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+.tag{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);color:rgba(255,255,255,.7);padding:6px 14px;border-radius:6px;font-size:13px;font-family:'JetBrains Mono',monospace}
+.cv-footer{margin-top:50px;font-size:12px;color:rgba(255,255,255,.3);letter-spacing:1.5px;text-transform:uppercase}
+
+/* LAYOUT */
+.wrap{max-width:1000px;margin:0 auto;padding:64px 40px}
+
+/* TOC */
+.toc{background:var(--sf);border:1px solid var(--bd);border-radius:14px;padding:40px;margin-bottom:64px;page-break-after:always}
+.toc-h{font-size:22px;font-weight:700;color:var(--p);padding-bottom:16px;border-bottom:2px solid var(--a);margin-bottom:28px}
+.toc-list{list-style:none}
+.toc-list li{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px dashed var(--bd)}
+.toc-list li:last-child{border:none}
+.toc-list li a{color:var(--tx);text-decoration:none;font-size:15px;font-weight:500;transition:.2s}
+.toc-list li a:hover{color:var(--a)}
+.toc-sub{padding-left:26px!important}
+.toc-sub a{font-size:14px!important;color:var(--mu)!important;font-weight:400!important}
+.toc-pg{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--mu)}
+
+/* SECTION */
+.sec{margin-bottom:80px}
+.pb{page-break-before:always}
+.sec-hdr{display:flex;align-items:center;gap:16px;margin-bottom:32px;padding-bottom:16px;border-bottom:2px solid var(--bd)}
+.sec-num{background:var(--a);color:#fff;min-width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700}
+.sec-title{font-size:26px;font-weight:700;color:var(--p)}
+.sec-sub{display:block;font-size:13px;font-weight:400;color:var(--mu);text-transform:uppercase;letter-spacing:1.2px;margin-top:4px}
+h3{font-size:18px;font-weight:600;color:var(--a2);margin:32px 0 16px;padding-left:14px;border-left:4px solid var(--a)}
+h4{font-size:14px;font-weight:700;color:var(--mu);margin:20px 0 12px;text-transform:uppercase;letter-spacing:1px}
+p{margin-bottom:16px}
+ul,ol{padding-left:26px;margin-bottom:16px}
+li{margin-bottom:8px}
+strong{font-weight:600}
+
+/* VISUAL DIAGRAMS */
+.diagram-container { background: var(--cb); padding: 40px; border-radius: 12px; margin: 24px 0; border: 1px solid rgba(255,255,255,0.1); display: flex; flex-direction: column; align-items: center; gap: 20px; overflow-x: auto; }
+.diag-row { display: flex; gap: 30px; justify-content: center; width: 100%; align-items: center; flex-wrap: wrap; }
+.diag-box { background: var(--sf); border: 2px solid var(--bd); padding: 18px 24px; border-radius: 10px; text-align: center; font-weight: 600; font-size: 14px; min-width: 220px; position: relative; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 2; }
+.diag-box.brain { border-color: #a5f3fc; background: linear-gradient(135deg,#1a1a2e,#0f3460); color: #fff; }
+.diag-box.shield { border-color: #f59e0b; background: linear-gradient(135deg,#1c1917,#44403c); color: #fff; }
+.diag-box.hand { border-color: #10b981; background: linear-gradient(135deg,#064e3b,#065f46); color: #fff; }
+.diag-box.db { border-color: #8b5cf6; background: linear-gradient(135deg,#1e1b4b,#312e81); color: #fff; }
+.diag-box.external { border-color: #e94560; color: #fff; background: transparent; border-style: dashed; }
+.diag-box span { display: block; font-size: 12px; font-weight: 400; margin-top: 8px; opacity: 0.85; line-height: 1.5; }
+.diag-arrow { width: 3px; height: 30px; background: var(--a); position: relative; margin: 0 auto; }
+.diag-arrow::after { content: ''; position: absolute; bottom: -6px; left: -5px; border-width: 7px 6px 0 6px; border-style: solid; border-color: var(--a) transparent transparent transparent; }
+.diag-arrow-right { width: 40px; height: 3px; background: var(--a); position: relative; }
+.diag-arrow-right::after { content: ''; position: absolute; right: -6px; top: -5px; border-width: 6px 0 6px 7px; border-style: solid; border-color: transparent transparent transparent var(--a); }
+
+/* CODE */
+.code-wrap{border-radius:10px;overflow:hidden;margin:18px 0;border:1px solid rgba(255,255,255,.05); box-shadow: 0 4px 12px rgba(0,0,0,0.05);}
+.code-bar{background:#1e293b;padding:10px 16px;display:flex;justify-content:space-between;align-items:center}
+.code-lang{font-family:'JetBrains Mono',monospace;font-size:12px;color:#cbd5e1;text-transform:uppercase;letter-spacing:1px; font-weight:600;}
+.code-dots span{width:12px;height:12px;border-radius:50%;display:inline-block;margin-left:6px}
+.code-dots .r{background:#ef4444}
+.code-dots .y{background:#f59e0b}
+.code-dots .g{background:#10b981}
+pre{background:var(--cb);padding:20px 24px;overflow-x:auto}
+code{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--ct);line-height:1.7}
+p code,li code,td code{background:#f1f5f9;color:#e94560;padding:3px 8px;border-radius:5px;font-size:13px;font-family:'JetBrains Mono',monospace}
+
+/* TABLE */
+table{width:100%;border-collapse:collapse;margin:18px 0;font-size:14px;border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+thead tr{background:var(--p)}
+thead th{color:#fff;padding:14px 20px;text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:1px;font-weight:600}
+tbody tr{border-bottom:1px solid var(--bd)}
+tbody tr:nth-child(even){background:var(--sf)}
+tbody td{padding:12px 20px;vertical-align:top}
+
+/* CALLOUT */
+.note{border-radius:10px;padding:18px 24px;margin:20px 0;border-left:5px solid;display:flex;gap:16px;align-items:flex-start}
+.note .ni{font-size:22px;flex-shrink:0}
+.note .nt strong{display:block;font-weight:600;font-size:15px;margin-bottom:6px}
+.note .nt p{font-size:14px;margin:0;line-height:1.7}
+.note.info{background:#eff6ff;border-color:var(--in);color:#1e40af}
+.note.warn{background:#fffbeb;border-color:var(--wn);color:#92400e}
+.note.danger{background:#fef2f2;border-color:var(--er);color:#991b1b}
+.note.ok{background:#f0fdf4;border-color:var(--ok);color:#166534}
+
+/* BADGE */
+.b{display:inline-block;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.b-g{background:#dcfce7;color:#166534}
+.b-r{background:#fee2e2;color:#991b1b}
+.b-y{background:#fef9c3;color:#854d0e}
+.b-b{background:#dbeafe;color:#1e40af}
+
+/* MODULE CARD */
+.mc{border:1px solid var(--bd);border-radius:14px;overflow:hidden;margin-bottom:32px; box-shadow: 0 4px 12px rgba(0,0,0,0.04);}
+.mc-hdr{padding:20px 28px;display:flex;align-items:center;gap:18px}
+.mc-hdr.brain{background:linear-gradient(135deg,#1a1a2e,#0f3460)}
+.mc-hdr.shield{background:linear-gradient(135deg,#1c1917,#44403c)}
+.mc-hdr.hand{background:linear-gradient(135deg,#064e3b,#065f46)}
+.mc-hdr.storage{background:linear-gradient(135deg,#1e1b4b,#312e81)}
+.mc-icon{width:56px;height:56px;border-radius:12px;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;font-size:28px}
+.mc-info h3{color:#fff;font-size:20px;margin:0 0 6px;border:none;padding:0}
+.mc-info p{color:rgba(255,255,255,.6);font-size:12px;margin:0;text-transform:uppercase;letter-spacing:1px}
+.mc-body{padding:26px 28px}
+.mc-meta{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+.mc-m{background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:8px 16px}
+.mc-m .ml{font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:1px; margin-bottom:4px;}
+.mc-m .mv{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--tx)}
+
+/* DB SCHEMA */
+.db-card{border:1px solid var(--bd);border-radius:12px;overflow:hidden;margin:20px 0; box-shadow: 0 4px 12px rgba(0,0,0,0.03);}
+.db-hdr{background:var(--p);padding:14px 22px;display:flex;justify-content:space-between;align-items:center}
+.db-hdr span{font-family:'JetBrains Mono',monospace;font-size:15px;color:#fff;font-weight:600}
+.db-hdr small{font-size:12px;color:rgba(255,255,255,.4)}
+.db-row{display:grid;grid-template-columns:180px 140px 1fr 90px;border-bottom:1px solid var(--bd)}
+.db-row:last-child{border:none}
+.db-row.h{background:var(--sf);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--mu)}
+.db-cell{padding:12px 18px;font-size:13px;border-right:1px solid var(--bd)}
+.db-cell:last-child{border:none}
+.pk{color:#f59e0b;font-size:11px;font-weight:700;margin-left:6px; background: rgba(245, 158, 11, 0.1); padding: 2px 6px; border-radius: 4px;}
+
+/* STEP LIST */
+.steps{list-style:none;padding:0;counter-reset:sc}
+.steps li{counter-increment:sc;padding:18px 20px 18px 60px;position:relative;border:1px solid var(--bd);border-radius:10px;margin-bottom:14px;background:var(--bg); box-shadow: 0 2px 6px rgba(0,0,0,0.02);}
+.steps li::before{content:counter(sc);position:absolute;left:16px;top:50%;transform:translateY(-50%);width:32px;height:32px;background:var(--a);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700}
+.steps li strong{display:block;font-size:15px;margin-bottom:6px; color: var(--p);}
+.steps li span{font-size:14px;color:var(--mu); line-height: 1.6;}
+
+/* KPI GRID */
+.kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin:24px 0}
+.kpi-c{background:var(--sf);border:1px solid var(--bd);border-radius:12px;padding:24px 20px;text-align:center; box-shadow: 0 4px 10px rgba(0,0,0,0.03);}
+.kpi-c .kv{font-size:36px;font-weight:700;color:var(--a);line-height:1}
+.kpi-c .kl{font-size:13px;color:var(--mu);margin-top:10px;text-transform:uppercase;letter-spacing:1px}
+
+/* ARCH DIAGRAM */
+.arch{background:var(--sf);border:1px solid var(--bd);border-radius:12px;padding:28px;margin:16px 0;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.8;color:var(--tx);overflow-x:auto}
+
+/* PRINT */
+@media print{
+  .cover, .mc-hdr, .diag-box, .diagram-container {-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .code-wrap, .mc, .diagram-container{page-break-inside:avoid}
+  thead{display:table-header-group}
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!--                        COVER PAGE                         -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="cover">
+  <div class="cv">
+    <div class="badge">Technical Specification Document</div>
+    <h1>TLab Monitor <em>SRE</em></h1>
+    <h2>AI-Driven Homelab Monitoring &amp; Self-Healing System</h2>
+    <div class="div"></div>
+    <p class="cv-desc">
+      Tài liệu đặc tả kỹ thuật đầy đủ dành cho cộng đồng mã nguồn mở, kỹ sư vận hành và phát triển hệ thống giám sát hạ tầng tự động, tích hợp xử lý thông minh bằng Trí tuệ Nhân tạo.
+    </p>
+    <div class="meta-grid">
+      <div class="meta-item"><div class="ml">Phiên bản</div><div class="mv">v1.1.0 — Open Source</div></div>
+      <div class="meta-item"><div class="ml">Kiến trúc</div><div class="mv">Agentic AI &amp; Dynamic Injection</div></div>
+      <div class="meta-item"><div class="ml">Phân loại</div><div class="mv">Public Repository</div></div>
+      <div class="meta-item"><div class="ml">Hệ thống Lõi</div><div class="mv">n8n Automation Engine</div></div>
+      <div class="meta-item"><div class="ml">AI Model</div><div class="mv">OpenRouter LLM API</div></div>
+      <div class="meta-item"><div class="ml">Trạng thái</div><div class="mv">✅ Sẵn sàng triển khai</div></div>
+    </div>
+    <div class="tags">
+      <span class="tag">n8n</span>
+      <span class="tag">Proxmox VE</span>
+      <span class="tag">Docker Socket</span>
+      <span class="tag">PostgreSQL RAG</span>
+      <span class="tag">Prometheus</span>
+      <span class="tag">Ntfy</span>
+      <span class="tag">LLM Reasoning</span>
+    </div>
+    <div class="cv-footer">TLab Monitor SRE &nbsp;·&nbsp; Advanced AI Architecture</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!--                    TABLE OF CONTENTS                       -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="wrap">
+<div class="toc">
+  <div class="toc-h">📋 Mục Lục</div>
+  <ul class="toc-list">
+    <li><a href="#s1">1. Tổng Quan Hệ Thống</a><span class="toc-pg">§1</span></li>
+    <li class="toc-sub"><a href="#s1-1">1.1 Mô tả &amp; Mục tiêu thiết kế</a></li>
+    <li class="toc-sub"><a href="#s1-2">1.2 Mục đích &amp; Vai trò của các thành phần</a></li>
+    <li class="toc-sub"><a href="#s1-3">1.3 Công nghệ sử dụng (Stack)</a></li>
+    <li><a href="#s2">2. Kiến Trúc Tổng Thể</a><span class="toc-pg">§2</span></li>
+    <li class="toc-sub"><a href="#s2-1">2.1 Topology mạng</a></li>
+    <li class="toc-sub"><a href="#s2-2">2.2 Quan hệ giữa các module</a></li>
+    <li class="toc-sub"><a href="#s2-3">2.3 Sơ đồ luồng dữ liệu End-to-End</a></li>
+    <li><a href="#s3">3. Đặc Tả Chi Tiết Các Module</a><span class="toc-pg">§3</span></li>
+    <li class="toc-sub"><a href="#s3-1">3.1 OC-3: Agentic Monitor — Brain</a></li>
+    <li class="toc-sub"><a href="#s3-2">3.2 OC-1: Decision &amp; Guardrail — Shield</a></li>
+    <li class="toc-sub"><a href="#s3-3">3.3 OC-2: Multi-Executor &amp; Verification — Hand</a></li>
+    <li class="toc-sub"><a href="#s3-4">3.4 OC-4: DB Helper &amp; RAG Memory — Storage</a></li>
+    <li><a href="#s4">4. Cơ Sở Dữ Liệu PostgreSQL</a><span class="toc-pg">§4</span></li>
+    <li><a href="#s5">5. Cơ Chế Bảo Vệ &amp; An Toàn</a><span class="toc-pg">§5</span></li>
+    <li><a href="#s8">6. Chỉ Số Hiệu Suất (KPIs)</a><span class="toc-pg">§6</span></li>
+    <li><a href="#s9">7. Lộ Trình Phát Triển</a><span class="toc-pg">§7</span></li>
+  </ul>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!--                    SECTION 1: OVERVIEW                    -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="sec" id="s1">
+  <div class="sec-hdr">
+    <div class="sec-num">1</div>
+    <div class="sec-title">Tổng Quan Hệ Thống<span>System Overview</span></div>
+  </div>
+
+  <h3 id="s1-1">1.1 Mô Tả &amp; Mục Tiêu Thiết Kế</h3>
+  <p><strong>TLab Monitor SRE</strong> là hệ thống giám sát và tự phục hồi hạ tầng tự lưu trữ (self-hosted) thế hệ mới. Được xây dựng trên nền tảng <code>n8n</code>, hệ thống tích hợp sâu mô hình AI (LLM) có khả năng tự động khám phá tài nguyên, suy luận nguyên nhân sự cố và độc lập đưa ra lệnh khắc phục mà không cần mã hóa cứng (hardcode) các thông số mạng.</p>
+  <p>Bản cập nhật kiến trúc mã nguồn mở (Open-Source) đã loại bỏ hoàn toàn các cấu hình IP tĩnh. Thay vào đó, AI tự động tra cứu, gán dữ liệu động (bơm IP, Token) từ bảng Mapping thông qua môi trường (Environment Variables) để tương tác chính xác với các Docker Hosts, QEMU và LXC trên Proxmox.</p>
+
+  <table>
+    <thead><tr><th>Mục tiêu Cốt lõi</th><th>Giải pháp kỹ thuật</th><th>Hiệu quả mang lại</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Tự động nhận diện hạ tầng</strong></td><td>Node <em>Live Auto-Discovery Agent</em> tự động chèn IP / Token tương ứng với tài sản lỗi.</td><td>Không cần cấu hình thủ công IP cho từng lỗi.</td></tr>
+      <tr><td><strong>Tiết kiệm Token AI</strong></td><td>Truy vấn RAG (Memory) để lấy giải pháp cũ thay vì gọi LLM với các lỗi lặp lại.</td><td>Giảm thiểu triệt để độ trễ và chi phí API.</td></tr>
+      <tr><td><strong>Bảo vệ Crash Loop</strong></td><td>Khóa tự động nếu ứng dụng sập >= 1 lần trong 10 phút.</td><td>Ngăn lỗi ổ đĩa/filesystem do vòng lặp khởi động.</td></tr>
+      <tr><td><strong>Làm sạch dữ liệu</strong></td><td>Hàm Sanitization xóa bỏ ký hiệu <code>=</code> thừa do lỗi luân chuyển JSON trong n8n.</td><td>Triệt tiêu sự cố sập luồng điều hướng (Routing).</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="s1-2">1.2 Mục Đích &amp; Vai Trò Của Các Thành Phần Cốt Lõi</h3>
+  <p>Hệ thống được thiết kế để giải quyết bài toán tự động hóa triệt để trong quản trị cụm máy chủ, nhắm đến các đối tượng và công nghệ đặc thù sau:</p>
+  <ul>
+    <li><strong>Đối với Docker (Container Management):</strong> Khi một container bị treo, ăn cạn RAM (OOM) hoặc bị tắt đột ngột, Prometheus sẽ báo động. TLab Monitor tự động phân giải cấu trúc, gọi trực tiếp vào <em>Docker Socket API</em> để tiến hành khởi động lại (Restart/Start) vùng chứa đó mà không cần kỹ sư gõ lệnh thủ công.</li>
+    <li><strong>Đối với Proxmox VE (PVE - Virtualization):</strong> Nhận diện được các máy ảo (QEMU) hoặc LXC bị sập. Hệ thống sẽ tự động ghép nối <em>Proxmox API Token</em> an toàn, định tuyến lệnh gọi REST API đến đúng Node vật lý để đánh thức (Wake up) máy ảo tương ứng.</li>
+    <li><strong>Đối với Trí tuệ Nhân tạo (Agentic AI):</strong> Đóng vai trò là "Kỹ sư SRE trực tuyến 24/7". Khi tiếp nhận Metrics, AI sẽ phân tích xem đây là hành vi bình thường (ví dụ: Hệ thống Camera đẩy CPU cao khi có chuyển động) hay là sự cố thực sự. Từ đó AI ra quyết định: Bỏ qua, Tự động sửa, hay Leo thang khẩn cấp (Escalate).</li>
+    <li><strong>Đối với Ntfy (Human-in-the-Loop):</strong> Tạo ra một trạm kiểm soát an toàn trên điện thoại. Với các lệnh có rủi ro cao tác động đến hạ tầng lõi, hệ thống sẽ đẩy thông báo Push Notification kèm 2 nút bấm (Approve / Reject). AI chỉ được phép thực thi khi con người xác nhận.</li>
+  </ul>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!--                  SECTION 2: ARCHITECTURE                  -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="sec pb" id="s2">
+  <div class="sec-hdr">
+    <div class="sec-num">2</div>
+    <div class="sec-title">Kiến Trúc Tổng Thể<span>Architecture &amp; System Design</span></div>
+  </div>
+
+  <h3 id="s2-1">2.1 Topology Mạng Mới</h3>
+  <div class="diagram-container">
+    <div class="diag-row">
+      <div class="diag-box external">🌐 Tầng Truy Cập Mạng Ngoài (External)<br><span>Cloudflare Tunnel / Reverse Proxy</span></div>
+    </div>
+    <div class="diag-arrow"></div>
+    <div class="diag-row">
+      <div class="diag-box brain" style="background:var(--sf); color:var(--tx); border-color:var(--mu);">
+        💻 Tầng Điều Khiển Trung Tâm (Core LAN)<br>
+        <span style="color:var(--tx)"><strong>n8n</strong> (:5678) &nbsp;•&nbsp; <strong>PostgreSQL</strong> (:5432) &nbsp;•&nbsp; <strong>Ntfy</strong> (:80)</span>
+      </div>
+    </div>
+    <div class="diag-arrow"></div>
+    <div class="diag-row" style="flex-wrap: wrap;">
+      <div class="diag-box hand">
+        🐳 Compute: Docker Hosts<br>
+        <span>Expose: Docker Socket Proxy (Port: 2375)</span>
+      </div>
+      <div class="diag-box db">
+        🖥️ Compute: Proxmox VE<br>
+        <span>Expose: Proxmox API (Port: 8006 / QEMU / LXC)</span>
+      </div>
+    </div>
+  </div>
+
+  <h3 id="s2-2">2.2 Quan Hệ Giữa Các Module</h3>
+  <div class="diagram-container">
+    <div class="diag-row">
+      <div class="diag-box external">1. Cảnh báo (Prometheus/Alertmanager)<br><span>POST /webhook/prometheus-alerts</span></div>
+    </div>
+    <div class="diag-arrow"></div>
+    <div class="diag-row">
+      <div class="diag-box brain">2. Bộ Não (OC-3)<br><span>Khám phá IP Động &amp; AI suy luận</span></div>
+    </div>
+    <div class="diag-arrow"></div>
+    <div class="diag-row">
+      <div class="diag-box shield">3. Cầu Dao / Phân Luồng (OC-1)<br><span>Chống Crash Loop &amp; Phê duyệt</span></div>
+      <div class="diag-arrow-right"></div>
+      <div class="diag-box db">Lưu Trữ (OC-4)<br><span>Ghi vết (Audit) &amp; Ký ức AI (Memory)</span></div>
+    </div>
+    <div class="diag-arrow"></div>
+    <div class="diag-row">
+      <div class="diag-box hand">4. Đôi Tay (OC-2)<br><span>Định tuyến lệnh (Docker / PVE API) &amp; Xác minh 10s</span></div>
+    </div>
+  </div>
+
+  <h3 id="s2-3">2.3 Sơ Đồ Luồng Dữ Liệu End-to-End</h3>
+  <div class="diagram-container">
+    <div class="diag-row">
+      <div class="diag-box" style="border-color: #3b82f6;"><strong>Alert Triggered</strong><br><span>Dịch vụ sập / Quá tải</span></div>
+      <div class="diag-arrow-right"></div>
+      <div class="diag-box brain"><strong>Discovery &amp; Inject</strong><br><span>Tìm kiếm biến số Động từ .env</span></div>
+      <div class="diag-arrow-right"></div>
+      <div class="diag-box db"><strong>Memory Check</strong><br><span>Hit RAG (Bypass AI) / Gọi OpenRouter</span></div>
+    </div>
+    <div class="diag-arrow"></div>
+    <div class="diag-row">
+      <div class="diag-box shield"><strong>Guardrail Check</strong><br><span>Kiểm tra Cầu dao (Crash Loop)</span></div>
+      <div class="diag-arrow-right"></div>
+      <div class="diag-box external" style="border-style: solid;"><strong>Ntfy Decision</strong><br><span>Auto Approve / Đợi Kỹ sư duyệt</span></div>
+      <div class="diag-arrow-right"></div>
+      <div class="diag-box hand"><strong>Execution</strong><br><span>Truyền lệnh REST API / Socket</span></div>
+    </div>
+    <div class="diag-arrow"></div>
+    <div class="diag-row">
+      <div class="diag-box" style="border-color:var(--ok);"><strong>Health Check</strong><br><span>Chờ 10 giây &amp; Xác minh tín hiệu</span></div>
+      <div class="diag-arrow-right"></div>
+      <div class="diag-box db"><strong>RAG Update</strong><br><span>Lưu giải pháp vào tlab_memory</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!--                  SECTION 3: MODULE DETAIL                 -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="sec pb" id="s3">
+  <div class="sec-hdr">
+    <div class="sec-num">3</div>
+    <div class="sec-title">Đặc Tả Chi Tiết Các Module<span>Module Specification</span></div>
+  </div>
+
+  <h3 id="s3-1">3.1 OC-3 — Agentic Monitor (The Brain)</h3>
+  <div class="mc">
+    <div class="mc-hdr brain">
+      <div class="mc-icon">🧠</div>
+      <div class="mc-info">
+        <h3>OC-3: Agentic Monitor</h3>
+        <p>Dynamic Injection · Zero-Token RAG · AI Reasoning</p>
+      </div>
+    </div>
+    <div class="mc-body">
+      <p>OC-3 là đỉnh cao của sự tự động hóa. Khi tiếp nhận cảnh báo, AI không xử lý chuỗi "mù". Thay vào đó, Node <strong>Live Auto-Discovery Agent</strong> sẽ lấy tên dịch vụ và tự động đọc các biến môi trường <code>$env</code> để tra cứu API Proxmox / Docker theo thời gian thực.</p>
+      <p>Sau khi định vị xong (ví dụ tìm thấy dịch vụ chạy ở <code>192.168.x.x</code> thuộc loại `container`), nó bơm chính xác thông số vào Payload. Hệ thống RAG Memory sau đó được đánh giá, nếu độ tin cậy của giải pháp cũ vượt mốc 0.90, AI sẽ nhường quyền cho "ký ức" giải quyết sự cố, tiết kiệm 100% token. Nếu không, OpenRouter AI sẽ tiếp quản phân tích.</p>
+    </div>
+  </div>
+
+  <h3 id="s3-2">3.2 OC-1 — Decision Tiering &amp; Guardrail (The Shield)</h3>
+  <div class="mc">
+    <div class="mc-hdr shield">
+      <div class="mc-icon">🛡️</div>
+      <div class="mc-info">
+        <h3>OC-1: Decision &amp; Guardrail</h3>
+        <p>Anti Crash Loop · JSON Integrity</p>
+      </div>
+    </div>
+    <div class="mc-body">
+      <p>OC-1 chặn đứng hậu quả của việc khởi động lại liên tục. Bằng câu lệnh SQL <code>COUNT(*)</code>, nó đếm số lượng cảnh báo trong vòng 10 phút. Nếu một Container hoặc VM sập ≥ 1 lần trong chu kỳ, cầu dao sẽ tự ngắt, phát lệnh CRITICAL qua Ntfy để cầu cứu con người.</p>
+      <p>Bên cạnh đó, để duy trì toàn vẹn dữ liệu truyền sang hệ thống vận hành, OC-1 bắt buộc phải đóng gói các biến bằng hàm <code>JSON.stringify</code>, chấm dứt hoàn toàn tình trạng lỗi định dạng Object làm sập luồng n8n.</p>
+    </div>
+  </div>
+
+  <h3 id="s3-3">3.3 OC-2 — Multi-Executor &amp; Verification (The Hand)</h3>
+  <div class="mc">
+    <div class="mc-hdr hand">
+      <div class="mc-icon">🤖</div>
+      <div class="mc-info">
+        <h3>OC-2: Multi-Executor &amp; Verification</h3>
+        <p>Smart Sanitization · Dynamic Routing API</p>
+      </div>
+    </div>
+    <div class="mc-body">
+      <p>Module này đã được loại bỏ hoàn toàn các địa chỉ IP tĩnh. Dựa vào siêu dữ liệu do OC-3 cung cấp, Node thực thi sẽ tự động gọi HTTP Request tới đúng môi trường đích (<code>http://${node_ip}:2375...</code>) một cách chính xác.</p>
+      <p>Node <strong>Clean Input</strong> thực hiện làm sạch dữ liệu lần cuối bằng chuỗi Regex <code>replace(/^=/, '')</code>, dọn dẹp các ký tự rác sinh ra trong quá trình luân chuyển dữ liệu trước khi Switch tiến hành rẽ nhánh tác vụ.</p>
+    </div>
+  </div>
+
+  <h3 id="s3-4">3.4 OC-4 — DB Helper &amp; RAG Memory (The Storage)</h3>
+  <div class="mc">
+    <div class="mc-hdr storage">
+      <div class="mc-icon">🗄️</div>
+      <div class="mc-info">
+        <h3>OC-4: DB Helper</h3>
+        <p>Memory Access · Event Processing</p>
+      </div>
+    </div>
+    <div class="mc-body">
+      <p>Quản lý truy xuất thông qua các đường dẫn Webhook nội bộ. Nó cho phép hệ thống lưu trữ trạng thái tài nguyên (CPU, Memory) vào bảng <code>tlab_events</code>, xuất báo cáo 20 hành động Audit gần nhất và lấy ra các bài học sửa lỗi xuất sắc nhất phục vụ cho AI.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!--                  SECTION 4: DATABASE                      -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="sec pb" id="s4">
+  <div class="sec-hdr">
+    <div class="sec-num">4</div>
+    <div class="sec-title">Cơ Sở Dữ Liệu PostgreSQL<span>Database Schema</span></div>
+  </div>
+  <p>Ba bảng lõi tạo nên bộ nhớ của AI. Tên bảng đã được chuẩn hóa đồng bộ cho TLab Monitor.</p>
+
+  <div class="diagram-container" style="flex-direction:row; align-items:flex-start;">
+    <div class="diag-box db" style="flex:1;">
+      <strong>tlab_audit</strong>
+      <div style="text-align:left; margin-top:14px; font-size:13px; line-height: 1.8;">
+        • execution_id<br>• action<br>• target<br>• reason<br>• decision<br>• result
+      </div>
+    </div>
+    <div class="diag-box db" style="flex:1;">
+      <strong>tlab_memory</strong>
+      <div style="text-align:left; margin-top:14px; font-size:13px; line-height: 1.8;">
+        • container<br>• issue_type<br>• root_cause<br>• solution<br>• outcome<br>• confidence
+      </div>
+    </div>
+    <div class="diag-box db" style="flex:1;">
+      <strong>tlab_events</strong>
+      <div style="text-align:left; margin-top:14px; font-size:13px; line-height: 1.8;">
+        • container<br>• metric_type<br>• metric_value<br>• recorded_at
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!--                SECTION 5: SAFETY MECHANISMS               -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="sec pb" id="s5">
+  <div class="sec-hdr">
+    <div class="sec-num">5</div>
+    <div class="sec-title">Cơ Chế Bảo Vệ &amp; An Toàn
+      <span>Safety Mechanisms &amp; Guardrails</span>
+    </div>
+  </div>
+
+  <div class="note warn">
+    <div class="ni">⚠️</div>
+    <div class="nt">
+      <strong>Khắc Phục Lỗi "JSON Render Bug" trong n8n</strong>
+      <p>Lỗi truyền tải JSON dẫn đến định dạng sai Object đã được giải quyết dứt điểm bằng phương pháp Bọc Đầu - Khóa Đuôi:
+      <br>1. Tại OC-1: Dùng biểu thức <code>JSON.stringify(...)</code> bao bọc lại toàn bộ nội dung gửi đi.
+      <br>2. Tại OC-2: Dùng Code Node <strong>Clean Input</strong> thực thi Regex loại bỏ các ký tự vô hình.</p>
+    </div>
+  </div>
+
+  <div class="note info">
+    <div class="ni">📌</div>
+    <div class="nt">
+      <strong>Kiểm soát Ảo giác AI (AI Hallucination Guard)</strong>
+      <p>Hệ thống không trao quyền kiểm soát mù quáng cho LLM. Tại phân hệ Parse AI JSON, quy tắc mã hóa cứng được áp dụng: Nếu tài sản được định vị là vùng chứa (container), lệnh xử lý sẽ bị ép tĩnh thành <code>restart</code>, chặn đứng hoàn toàn việc AI sáng tác ra các lệnh phá hoại hệ điều hành.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!--                  SECTION 8 & 9: ROADMAP                   -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="sec pb" id="s8">
+  <div class="sec-hdr">
+    <div class="sec-num">6</div>
+    <div class="sec-title">Chỉ Số Hiệu Suất &amp; KPIs
+      <span>Key Performance Indicators</span>
+    </div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-c">
+      <div class="kv">100%</div>
+      <div class="kl">Bảo mật API/Token qua .env</div>
+    </div>
+    <div class="kpi-c">
+      <div class="kv">&lt; 3p</div>
+      <div class="kl">Thời gian Recovery trung bình</div>
+    </div>
+    <div class="kpi-c">
+      <div class="kv">Active</div>
+      <div class="kl">Chống Crash Loop vòng lặp</div>
+    </div>
+  </div>
+
+  <h3 id="s9" style="margin-top: 50px;">7. Lộ Trình Phát Triển Tương Lai (Roadmap)</h3>
+  <table>
+    <thead><tr><th>Phiên bản tương lai</th><th>Mô tả lộ trình mở rộng</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Smart Executor (Đa bước)</strong></td>
+        <td>Bổ sung khả năng lên kế hoạch xử lý chuỗi: Tự động trích xuất Logs → Giao AI chẩn đoán sâu → Sửa cấu hình nội bộ → Khởi động lại.</td>
+      </tr>
+      <tr>
+        <td><strong>Predictive Alerting</strong></td>
+        <td>Ứng dụng thuật toán phân tích chuỗi thời gian từ bảng <code>tlab_events</code> để đoán trước sự cố OOM (tràn RAM) trước 30 phút.</td>
+      </tr>
+      <tr>
+        <td><strong>Auto Playbook Generator</strong></td>
+        <td>Sau khi sự cố được khắc phục, AI sẽ tự động xuất ra tài liệu Runbook định dạng Markdown, lưu trữ lại cho đội ngũ kỹ sư học hỏi.</td>
+      </tr>
+    </tbody>
+  </table>
+  
+  <br>
+  <div style="text-align:center; color: var(--mu); font-size: 13px; margin-top: 50px; border-top: 1px dashed var(--bd); padding-top: 24px;">
+    <i>— End of Technical Document —<br>TLab Monitor SRE Architecture Design © 2026</i>
+  </div>
+</div>
+</div>
+</body>
+</html>

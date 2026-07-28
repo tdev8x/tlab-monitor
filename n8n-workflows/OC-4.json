@@ -1,0 +1,97 @@
+{
+  "name": "OC-4: TLab DB Helper & Storage",
+  "nodes": [
+    {
+      "parameters": { "httpMethod": "POST", "path": "tlab-save-metrics", "options": {} },
+      "id": "9f57fee5-8c95-40a3-83f9-bb0f0058f310",
+      "name": "Save Metrics Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [ 496, 224 ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || {};\nconst rawMetrics = body.metrics || {};\nconst values = [];\nconst ts = new Date().toISOString();\nif (typeof rawMetrics === 'object' && rawMetrics !== null) {\n  for (const [nameRaw, data] of Object.entries(rawMetrics)) {\n    const name = nameRaw.replace(/'/g, '');\n    if (!name || name === 'unknown') continue;\n    values.push(`('${name}', 'cpu', ${parseFloat(data.cpu || 0).toFixed(4)}, '${ts}')`);\n    values.push(`('${name}', 'memory', ${parseFloat(data.memory || 0).toFixed(4)}, '${ts}')`);\n  }\n}\nif (values.length === 0) return [{ json: { query: 'SELECT 1;', count: 0 } }];\nreturn [{ json: { query: 'INSERT INTO tlab_events (container, metric_type, metric_value, recorded_at) VALUES ' + values.join(','), count: values.length / 2 } }];"
+      },
+      "id": "05dbf45a-9b8a-435c-8358-5f3ee31b5ba3",
+      "name": "Write Metrics DB",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [ 736, 224 ]
+    },
+    {
+      "parameters": { "operation": "executeQuery", "query": "{{ $json.query }}", "options": {} },
+      "id": "089de68b-0a73-4b31-ab60-e62f6d6782aa",
+      "name": "Exec Insert Metrics",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [ 976, 224 ],
+      "credentials": { "postgres": { "id": "KiYa8bAsCxMFKNdd", "name": "PostgreSQL Homelab" } }
+    },
+    {
+      "parameters": { "path": "tlab-get-history", "options": {} },
+      "id": "ae7652d3-76b5-4ab4-8424-043560155b09",
+      "name": "Get History Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [ 496, 416 ]
+    },
+    {
+      "parameters": { "operation": "executeQuery", "query": "SELECT action, target, decision, result, decided_at FROM tlab_audit WHERE decided_at > NOW() - INTERVAL '24 hours' ORDER BY decided_at DESC LIMIT 20", "options": {} },
+      "id": "f35d2cec-9d83-4202-b402-5ca4c2d5967a",
+      "name": "Query History",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [ 736, 416 ],
+      "credentials": { "postgres": { "id": "KiYa8bAsCxMFKNdd", "name": "PostgreSQL Homelab" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all();\nif (!rows.length) return [{ json: { history: 'No actions found in the last 24 hours' } }];\nconst text = rows.map(r => { const d = r.json; const time = d.decided_at ? new Date(d.decided_at).toLocaleString() : 'pending'; return `- ${d.action} ${d.target}: ${d.decision||'pending'} / ${d.result||'?'} at ${time}`; }).join('\\n');\nreturn [{ json: { history: text } }];"
+      },
+      "id": "eb31faa1-6489-4f55-be6c-a0b178aadc4b",
+      "name": "Format History",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [ 976, 416 ]
+    },
+    {
+      "parameters": { "path": "tlab-get-memory", "options": {} },
+      "id": "b3f12d85-7231-48d5-8c46-162fb36275b1",
+      "name": "Get Memory Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [ 496, 624 ]
+    },
+    {
+      "parameters": { "operation": "executeQuery", "query": "SELECT container, issue_type, root_cause, solution, outcome, confidence FROM tlab_memory WHERE (container = '{{ ($json.query?.target || \"\").replace(/'/g, \"''\") }}' OR container = 'system') AND outcome = 'SUCCESS' ORDER BY learned_at DESC LIMIT 3;", "options": {} },
+      "id": "389f33f5-e31c-4b5a-b853-005ddfdb0ef6",
+      "name": "Query Memory",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [ 736, 624 ],
+      "credentials": { "postgres": { "id": "KiYa8bAsCxMFKNdd", "name": "PostgreSQL Homelab" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all();\nif (!rows.length) return [{ json: { memory: 'No lessons recorded yet' } }];\nconst text = rows.map(r => { const d = r.json; return `- ${d.container} [${d.issue_type}]: ${d.root_cause||'Issue'} → Solution: ${d.solution} (${d.outcome}, confidence: ${d.confidence})`; }).join('\\n');\nreturn [{ json: { memory: text } }];"
+      },
+      "id": "0d623573-235f-41f1-85d1-5354a025d1ca",
+      "name": "Format Memory",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [ 976, 624 ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Save Metrics Webhook": { "main": [ [ { "node": "Write Metrics DB", "type": "main", "index": 0 } ] ] },
+    "Write Metrics DB": { "main": [ [ { "node": "Exec Insert Metrics", "type": "main", "index": 0 } ] ] },
+    "Get History Webhook": { "main": [ [ { "node": "Query History", "type": "main", "index": 0 } ] ] },
+    "Query History": { "main": [ [ { "node": "Format History", "type": "main", "index": 0 } ] ] },
+    "Get Memory Webhook": { "main": [ [ { "node": "Query Memory", "type": "main", "index": 0 } ] ] },
+    "Query Memory": { "main": [ [ { "node": "Format Memory", "type": "main", "index": 0 } ] ] }
+  },
+  "active": true,
+  "settings": { "executionOrder": "v1" }
+}

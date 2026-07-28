@@ -1,0 +1,58 @@
+groups:
+  - name: host_alerts
+    rules:
+      - alert: HostDown
+        expr: up{job="node-exporter"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "🔴 HOST DISCONNECTED: {{ $labels.alias }}"
+          description: "Host/VM {{ $labels.alias }} ({{ $labels.instance }}) is down or not responding to Node Exporter."
+
+      - alert: HostHighCPU
+        expr: 100 - (avg by(instance, alias, container) (rate(node_cpu_seconds_total{mode="idle"}[2m])) * 100) > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "⚠️ HIGH CPU LOAD: {{ $labels.alias }}"
+          description: "Host {{ $labels.alias }} CPU usage > 85% continuously for 5 minutes."
+
+      - alert: HostLowMemory
+        expr: (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100 < 15
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "⚠️ CRITICALLY LOW MEMORY: {{ $labels.alias }}"
+          description: "Host {{ $labels.alias }} has less than 15% available RAM."
+
+      - alert: HostDiskAlmostFull
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 < 20
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "💾 DISK ALMOST FULL: {{ $labels.alias }}"
+          description: "Root disk (/) on {{ $labels.alias }} exceeds 80% capacity."
+
+  - name: service_alerts
+    rules:
+      - alert: HttpServiceDown
+        expr: probe_success{job="blackbox"} == 0
+        for: 15s
+        labels:
+          severity: critical
+        annotations:
+          summary: "🌐 HTTP SERVICE DOWN: {{ $labels.alias }}"
+          description: "Service {{ $labels.alias }} (Target: {{ $labels.instance }}) is unreachable via HTTP."
+
+      - alert: TcpServiceDown
+        expr: probe_success{job="blackbox-tcp"} == 0
+        for: 15s
+        labels:
+          severity: critical
+        annotations:
+          summary: "🔌 TCP SERVICE DOWN: {{ $labels.alias }}"
+          description: "Service {{ $labels.alias }} (Target: {{ $labels.instance }}) is not responding to TCP connection."

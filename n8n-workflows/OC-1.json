@@ -1,0 +1,145 @@
+{
+  "name": "OC-1: TLab Decision & Guardrail",
+  "nodes": [
+    {
+      "parameters": { "httpMethod": "POST", "path": "tlab-propose", "options": {} },
+      "id": "7b25ac0d-d272-4416-84f3-1dd47202f8cd",
+      "name": "Receive Proposal Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [ 192, 1296 ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT CAST(COUNT(*) AS INT) as recent_count FROM tlab_audit WHERE target = '{{ ($json.body?.target || $json.target || \"\").replace(/'/g, \"''\") }}' AND proposed_at > NOW() - INTERVAL '10 minutes';",
+        "options": {}
+      },
+      "id": "aa760a8a-b552-4f61-a193-228cf6bafeb2",
+      "name": "Check Frequency in DB",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [ 416, 1296 ],
+      "credentials": { "postgres": { "id": "KiYa8bAsCxMFKNdd", "name": "PostgreSQL Homelab" } }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "strict", "version": 1 },
+          "conditions": [
+            { "id": "c2", "leftValue": "={{ $('Receive Proposal Webhook').first().json.body?.risk || 'high' }}", "rightValue": "low", "operator": { "type": "string", "operation": "equals" } }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "3494ec72-bc06-44b5-8520-65804ae27b76",
+      "name": "Low Risk?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [ 864, 1408 ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env[\"N8N_PUBLIC_DOMAIN\"] }}/webhook/tlab-decision",
+        "sendQuery": true,
+        "specifyQuery": "json",
+        "jsonQuery": "={{ JSON.stringify({\n  execution_id: $execution.id,\n  action: $('Receive Proposal Webhook').first().json.body?.action || 'restart',\n  target: $('Receive Proposal Webhook').first().json.body?.target || '',\n  asset_type: $('Receive Proposal Webhook').first().json.body?.asset_type || 'container',\n  vmid: $('Receive Proposal Webhook').first().json.body?.vmid || '',\n  node_ip: $('Receive Proposal Webhook').first().json.body?.node_ip || $env[\"N8N_LOCAL_IP\"],\n  node_name: $('Receive Proposal Webhook').first().json.body?.node_name || 'pve',\n  pve_token: $('Receive Proposal Webhook').first().json.body?.pve_token || '',\n  decision: 'approve'\n}) }}",
+        "options": {}
+      },
+      "id": "0f404f2e-a1d7-42c2-aaa4-1f1d4aa1ee9e",
+      "name": "Auto Trigger OC-2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [ 1088, 1312 ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env[\"NTFY_PUBLIC_DOMAIN\"] }}/",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "Authorization", "value": "={{ 'Basic ' + $env[\"NTFY_BASE64_CREDENTIALS\"] }}" }, { "name": "Content-Type", "value": "application/json" } ] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  {\n    \"topic\": \"homelab-approve\",\n    \"title\": \"⚡ [AUTO APPROVED] \" + (($('Receive Proposal Webhook').first().json.body?.action || 'ACTION').toUpperCase()) + \" \" + ($('Receive Proposal Webhook').first().json.body?.target || ''),\n    \"priority\": 3,\n    \"tags\": [\"white_check_mark\", \"robot\"],\n    \"message\": \"✅ SAFE TASK AUTO-EXECUTED\\n\\nReason: \" + ($('Receive Proposal Webhook').first().json.body?.reason || 'Automated recovery')\n  }\n}}",
+        "options": {}
+      },
+      "id": "48a8008b-7969-49d2-8dc3-2d813a67caf8",
+      "name": "Send Ntfy AUTO-OK",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [ 1312, 1312 ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env[\"NTFY_PUBLIC_DOMAIN\"] }}/",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "Authorization", "value": "={{ 'Basic ' + $env[\"NTFY_BASE64_CREDENTIALS\"] }}" }, { "name": "Content-Type", "value": "application/json" } ] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  {\n    \"topic\": \"homelab-approve\",\n    \"title\": (($('Receive Proposal Webhook').first().json.body?.action || 'ACTION').toUpperCase()) + \" \" + ($('Receive Proposal Webhook').first().json.body?.target || ''),\n    \"priority\": 4,\n    \"tags\": [\"warning\", \"robot\"],\n    \"message\": $('Receive Proposal Webhook').first().json.body?.reason || 'Recovery task approval required',\n    \"actions\": [\n      {\n        \"action\": \"http\",\n        \"label\": \"APPROVE\",\n        \"url\": $env[\"N8N_PUBLIC_DOMAIN\"] + \"/webhook/tlab-decision?execution_id=\" + $execution.id + \"&action=\" + ($('Receive Proposal Webhook').first().json.body?.action || '') + \"&target=\" + encodeURIComponent($('Receive Proposal Webhook').first().json.body?.target || '') + \"&asset_type=\" + ($('Receive Proposal Webhook').first().json.body?.asset_type || '') + \"&vmid=\" + ($('Receive Proposal Webhook').first().json.body?.vmid || '') + \"&node_ip=\" + ($('Receive Proposal Webhook').first().json.body?.node_ip || '') + \"&node_name=\" + ($('Receive Proposal Webhook').first().json.body?.node_name || '') + \"&pve_token=\" + encodeURIComponent($('Receive Proposal Webhook').first().json.body?.pve_token || '') + \"&decision=approve\",\n        \"method\": \"GET\",\n        \"clear\": true\n      },\n      {\n        \"action\": \"http\",\n        \"label\": \"REJECT\",\n        \"url\": $env[\"N8N_PUBLIC_DOMAIN\"] + \"/webhook/tlab-decision?execution_id=\" + $execution.id + \"&action=\" + ($('Receive Proposal Webhook').first().json.body?.action || '') + \"&target=\" + encodeURIComponent($('Receive Proposal Webhook').first().json.body?.target || '') + \"&decision=reject\",\n        \"method\": \"GET\",\n        \"clear\": true\n      }\n    ]\n  }\n}}",
+        "options": {}
+      },
+      "id": "7885155f-e027-41b8-866a-3171a2d44782",
+      "name": "Send Ntfy Normal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [ 1088, 1504 ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env[\"NTFY_PUBLIC_DOMAIN\"] }}/",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "Authorization", "value": "={{ 'Basic ' + $env[\"NTFY_BASE64_CREDENTIALS\"] }}" }, { "name": "Content-Type", "value": "application/json" } ] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  {\n    \"topic\": \"homelab-approve\",\n    \"title\": \"🚨 [CIRCUIT BREAKER ACTIVATED] \" + ($('Receive Proposal Webhook').first().json.body?.target || 'SYSTEM') + \" CRASH LOOP\",\n    \"priority\": 5,\n    \"tags\": [\"rotating_light\", \"recycled\"],\n    \"message\": \"⚠️ TLAB ALERT: Target \" + ($('Receive Proposal Webhook').first().json.body?.target || '') + \" has requested remediation too many times in 10 mins. AUTOMATICALLY LOCKED to prevent Crash Loop.\"\n  }\n}}",
+        "options": {}
+      },
+      "id": "78a4ccd7-5a6f-48ce-ab67-64887b3a4809",
+      "name": "Send Ntfy CRITICAL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [ 864, 1184 ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO tlab_audit (execution_id, action, target, reason, proposed_at) VALUES ('{{ $execution.id }}', '{{ ($('Receive Proposal Webhook').first().json.body?.action || \"\").replace(/'/g, \"''\") }}', '{{ ($('Receive Proposal Webhook').first().json.body?.target || \"\").replace(/'/g, \"''\") }}', '{{ ($('Receive Proposal Webhook').first().json.body?.reason || \"\").replace(/'/g, \"''\") }}', NOW());",
+        "options": {}
+      },
+      "id": "cde17b72-d9a3-45cf-8d33-fca7a6c671b5",
+      "name": "Save PostgreSQL Audit",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [ 1536, 1296 ],
+      "credentials": { "postgres": { "id": "KiYa8bAsCxMFKNdd", "name": "PostgreSQL Homelab" } }
+    },
+    {
+      "parameters": {
+        "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 1 }, "conditions": [ { "id": "c1", "leftValue": "={{ $json.recent_count }}", "rightValue": 1, "operator": { "type": "number", "operation": "gte" } } ], "combinator": "and" },
+        "options": {}
+      },
+      "id": "e7e01126-a761-46cf-8fe5-ff1d6ed987f8",
+      "name": "Exceed 3 Times / 10m?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [ 640, 1296 ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Receive Proposal Webhook": { "main": [ [ { "node": "Check Frequency in DB", "type": "main", "index": 0 } ] ] },
+    "Check Frequency in DB": { "main": [ [ { "node": "Exceed 3 Times / 10m?", "type": "main", "index": 0 } ] ] },
+    "Low Risk?": { "main": [ [ { "node": "Auto Trigger OC-2", "type": "main", "index": 0 } ], [ { "node": "Send Ntfy Normal", "type": "main", "index": 0 } ] ] },
+    "Auto Trigger OC-2": { "main": [ [ { "node": "Send Ntfy AUTO-OK", "type": "main", "index": 0 } ] ] },
+    "Send Ntfy AUTO-OK": { "main": [ [ { "node": "Save PostgreSQL Audit", "type": "main", "index": 0 } ] ] },
+    "Send Ntfy Normal": { "main": [ [ { "node": "Save PostgreSQL Audit", "type": "main", "index": 0 } ] ] },
+    "Send Ntfy CRITICAL": { "main": [ [ { "node": "Save PostgreSQL Audit", "type": "main", "index": 0 } ] ] },
+    "Exceed 3 Times / 10m?": { "main": [ [ { "node": "Send Ntfy CRITICAL", "type": "main", "index": 0 } ], [ { "node": "Low Risk?", "type": "main", "index": 0 } ] ] }
+  },
+  "active": true,
+  "settings": { "executionOrder": "v1" }
+}

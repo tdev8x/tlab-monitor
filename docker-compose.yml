@@ -1,0 +1,107 @@
+version: '3.8'
+
+services:
+  # ==============================================================================
+  # 1. DATABASE (Audit Log & AI Memory Storage)
+  # ==============================================================================
+  tlab-db:
+    image: postgres:15-alpine
+    container_name: tlab_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-tlab_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME:-tlab_db}
+      TZ: ${TZ:-Asia/Ho_Chi_Minh}
+    volumes:
+      - tlab_db_data:/var/lib/postgresql/data
+      # Automatically load the 3-table schema on the first run
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - tlab_net
+
+  # ==============================================================================
+  # 2. CENTRAL BRAIN (n8n Automation Engine)
+  # ==============================================================================
+  tlab-engine:
+    image: docker.n8n.io/n8nio/n8n:latest
+    container_name: tlab_n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - GENERIC_TIMEZONE=${TZ:-Asia/Ho_Chi_Minh}
+      - TZ=${TZ:-Asia/Ho_Chi_Minh}
+      # --- Inject .env variables into n8n for dynamic AI lookups ---
+      - N8N_LOCAL_IP=${N8N_LOCAL_IP}
+      - N8N_PUBLIC_DOMAIN=${N8N_PUBLIC_DOMAIN}
+      - NTFY_PUBLIC_DOMAIN=${NTFY_PUBLIC_DOMAIN}
+      - NTFY_BASE64_CREDENTIALS=${NTFY_BASE64_CREDENTIALS}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - PROXMOX_API_TOKEN=${PROXMOX_API_TOKEN}
+    volumes:
+      - tlab_n8n_data:/home/node/.n8n
+    depends_on:
+      - tlab-db
+    networks:
+      - tlab_net
+
+  # ==============================================================================
+  # 3. DOCKER COMMUNICATION CHANNEL (Secure API Execution)
+  # ==============================================================================
+  tlab-docker-proxy:
+    image: alpine/socat
+    container_name: tlab_docker_proxy
+    restart: unless-stopped
+    command: TCP-LISTEN:2375,fork,reuseaddr UNIX-CONNECT:/var/run/docker.sock
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      # CRITICAL: Only expose this port to Localhost for security
+      - "127.0.0.1:2375:2375"
+    networks:
+      - tlab_net
+
+  # ==============================================================================
+  # 4. OBSERVABILITY STACK (Prometheus & Alertmanager)
+  # ==============================================================================
+  tlab-prometheus:
+    image: prom/prometheus:latest
+    container_name: tlab_prometheus
+    restart: unless-stopped
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - tlab_prom_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=15d'
+    ports:
+      - "9090:9090"
+    networks:
+      - tlab_net
+
+  tlab-alertmanager:
+    image: prom/alertmanager:latest
+    container_name: tlab_alertmanager
+    restart: unless-stopped
+    volumes:
+      - ./prometheus/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    ports:
+      - "9093:9093"
+    networks:
+      - tlab_net
+
+networks:
+  tlab_net:
+    driver: bridge
+
+# Docker manages volume permissions automatically
+volumes:
+  tlab_db_data:
+  tlab_n8n_data:
+  tlab_prom_data:

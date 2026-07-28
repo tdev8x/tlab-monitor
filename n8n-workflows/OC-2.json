@@ -1,0 +1,205 @@
+{
+  "name": "OC-2: TLab Multi-Executor & Verification",
+  "nodes": [
+    {
+      "parameters": { "path": "tlab-decision", "options": {} },
+      "id": "436f9675-34fb-4575-9b10-a112aabe5c4a",
+      "name": "Webhook Receive Decision",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [ -336, 992 ]
+    },
+    {
+      "parameters": {
+        "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 1 }, "conditions": [ { "id": "cond-approve", "leftValue": "={{ $json.query.decision }}", "rightValue": "approve", "operator": { "type": "string", "operation": "equals" } } ], "combinator": "and" },
+        "options": {}
+      },
+      "id": "c5d74f29-ef4b-4074-a5bd-e30309dfc8da",
+      "name": "Approve Or Reject?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [ 144, 992 ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 1 }, "conditions": [ { "leftValue": "={{ ['qm_start', 'vm_start'].includes($json.query.action) || $json.query.asset_type === 'qemu' }}", "rightValue": true, "operator": { "type": "boolean", "operation": "true" } } ], "combinator": "and" } },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 1 }, "conditions": [ { "leftValue": "={{ ['pct_start', 'lxc_start'].includes($json.query.action) || $json.query.asset_type === 'lxc' }}", "rightValue": true, "operator": { "type": "boolean", "operation": "true" } } ], "combinator": "and" } },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 1 }, "conditions": [ { "leftValue": "={{ ['restart', 'start', 'stop'].includes($json.query.action) || $json.query.asset_type === 'container' }}", "rightValue": true, "operator": { "type": "boolean", "operation": "true" } } ], "combinator": "and" } }
+          ]
+        },
+        "options": { "fallbackOutput": "extra" }
+      },
+      "id": "4066d6a0-cd9e-4f67-bd71-62eda2f3b2f0",
+      "name": "Dynamic Action Router",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [ 368, 816 ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://{{ $json.query.node_ip }}:8006/api2/json/nodes/{{ $json.query.node_name || 'pve' }}/qemu/{{ $json.query.vmid }}/status/start",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "Authorization", "value": "={{ decodeURIComponent($json.query.pve_token || '') }}" } ] },
+        "options": { "allowUnauthorizedCerts": true }
+      },
+      "id": "c79809f5-2bfd-48cc-8240-ad6b313112d4",
+      "name": "Start QEMU VM Proxmox",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [ 672, 432 ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://{{ $json.query.node_ip }}:8006/api2/json/nodes/{{ $json.query.node_name || 'pve' }}/lxc/{{ $json.query.vmid }}/status/start",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "Authorization", "value": "={{ decodeURIComponent($json.query.pve_token || '') }}" } ] },
+        "options": { "allowUnauthorizedCerts": true }
+      },
+      "id": "93bc4224-3276-4735-bffa-ab2d08759c44",
+      "name": "Start LXC Proxmox",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [ 672, 592 ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'http://' + ($json.query.node_ip || $env[\"N8N_LOCAL_IP\"]) + ':2375/containers/' + encodeURIComponent($json.query.target || '') + '/' + $json.query.action }}",
+        "options": {}
+      },
+      "id": "c80b2b4b-c2ab-4873-a380-fd99de22d370",
+      "name": "Execute Docker API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [ 672, 752 ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": { "amount": 10 },
+      "id": "4d10f25f-989f-46d2-8a3b-7771d397a1be",
+      "name": "Wait 10s Verification",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [ 848, 592 ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const query = $('Clean Input').first().json.query || {};\nlet target = query.target || '';\ntry { target = decodeURIComponent(target); } catch(e) {}\n\nconst httpReq = typeof helpers !== 'undefined' ? helpers.httpRequest : $helpers.httpRequest;\nlet isUp = false;\n\nconst nodeIp = query.node_ip || $env.get('N8N_LOCAL_IP');\nconst assetType = (query.asset_type || 'container').toLowerCase();\n\nif (assetType === 'container' || ['restart', 'start', 'stop'].includes(query.action)) {\n  try {\n    const dockerRes = await httpReq({ method: 'GET', url: `http://${nodeIp}:2375/containers/${encodeURIComponent(target)}/json`, timeout: 3000, json: true });\n    if (dockerRes && dockerRes.State && dockerRes.State.Running === true) isUp = true;\n  } catch (err) {}\n}\n\nif (!isUp && query.vmid && query.pve_token) {\n  try {\n    const pveType = (assetType === 'lxc' || ['pct_start', 'lxc_start'].includes(query.action)) ? 'lxc' : 'qemu';\n    const nodeName = query.node_name || 'pve';\n    const token = decodeURIComponent(query.pve_token);\n    const pveRes = await httpReq({ method: 'GET', url: `https://${nodeIp}:8006/api2/json/nodes/${nodeName}/${pveType}/${query.vmid}/status/current`, headers: { 'Authorization': token }, skipSslCertificateValidation: true, rejectUnauthorized: false, timeout: 4000, json: true });\n    if (pveRes && pveRes.data && pveRes.data.status === 'running') isUp = true;\n  } catch (err) {}\n}\n\nif (!isUp) {\n  let checkUrl = '';\n  if (target.startsWith('http://') || target.startsWith('https://')) checkUrl = target;\n  else {\n    const cleanHost = target.split(':')[0];\n    if (/^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$/.test(cleanHost)) {\n      const port = target.includes(':') ? target.split(':')[1] : '80';\n      checkUrl = `http://${cleanHost}:${port}`;\n    }\n  }\n  if (checkUrl) {\n    try {\n      const res = await httpReq({ method: 'GET', url: checkUrl, timeout: 3000, returnFullResponse: true });\n      isUp = (res.statusCode >= 200 && res.statusCode < 405);\n    } catch (err) { isUp = false; }\n  }\n}\n\nreturn [{ json: { isUp, target, action: query.action, vmid: query.vmid } }];"
+      },
+      "id": "d1cd0ab1-d8d0-43f5-8ae0-e1d3b5b341e0",
+      "name": "Health Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [ 1040, 592 ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE tlab_audit SET decision = 'approve', result = '{{ $json.isUp ? \"executed\" : \"failed\" }}', decided_at = NOW() WHERE execution_id = '{{ ($('Webhook Receive Decision').first().json.query?.execution_id || \"\").replace(/'/g, \"''\") }}';",
+        "options": {}
+      },
+      "id": "e338aa40-7c1a-4c84-bf92-cb5c6c53c16d",
+      "name": "Save Audit Log",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [ 1264, 592 ],
+      "credentials": { "postgres": { "id": "KiYa8bAsCxMFKNdd", "name": "PostgreSQL Homelab" } },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO tlab_memory (container, issue_type, symptoms, root_cause, solution, outcome, confidence, learned_at) VALUES ('{{ ($json.target || \"system\").replace(/'/g, \"''\") }}', '{{ ($json.action || \"unknown\").replace(/'/g, \"''\") }}', 'Disconnected / Powered off', 'Automated API recovery', 'Reactivated Service/VMID {{ $json.vmid }}', '{{ $json.isUp ? \"SUCCESS\" : \"FAILED\" }}', 0.95, NOW());",
+        "options": {}
+      },
+      "id": "41953947-4f77-4b85-83f9-dc8f27bcc628",
+      "name": "Save RAG Memory",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [ 1504, 576 ],
+      "credentials": { "postgres": { "id": "KiYa8bAsCxMFKNdd", "name": "PostgreSQL Homelab" } },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env[\"NTFY_PUBLIC_DOMAIN\"] }}/",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "Authorization", "value": "={{ 'Basic ' + $env[\"NTFY_BASE64_CREDENTIALS\"] }}" }, { "name": "Content-Type", "value": "application/json" } ] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  {\n    \"topic\": \"homelab-approve\",\n    \"title\": ($('Health Check').first().json.isUp ? \"✅ [APPROVED & EXECUTED] \" : \"❌ [EXECUTION FAILED] \") + (($('Webhook Receive Decision').first().json.query?.action || 'ACTION').toUpperCase()) + \" \" + ($('Webhook Receive Decision').first().json.query?.target || ''),\n    \"priority\": $('Health Check').first().json.isUp ? 3 : 4,\n    \"tags\": [$('Health Check').first().json.isUp ? \"white_check_mark\" : \"x\", \"robot\"],\n    \"message\": \"Confirmed: Approved command has been sent and processed.\\nTarget: \" + ($('Webhook Receive Decision').first().json.query?.target || '') + \"\\nService Status: \" + ($('Health Check').first().json.isUp ? \"ONLINE (Success)\" : \"OFFLINE (Failed)\")\n  }\n}}",
+        "options": {}
+      },
+      "id": "1cb98752-4617-4c9e-83d3-dfaf44c4c93c",
+      "name": "Send Ntfy Approve Result",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [ 1712, 560 ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE tlab_audit SET decision = 'reject', result = 'cancelled', decided_at = NOW() WHERE execution_id = '{{ ($('Webhook Receive Decision').first().json.query?.execution_id || \"\").replace(/'/g, \"''\") }}';",
+        "options": {}
+      },
+      "id": "9794e9cb-02e1-4a53-9ecd-a9f55c26f873",
+      "name": "Save Audit Log Reject",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [ 368, 1168 ],
+      "credentials": { "postgres": { "id": "KiYa8bAsCxMFKNdd", "name": "PostgreSQL Homelab" } },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env[\"NTFY_PUBLIC_DOMAIN\"] }}/",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "Authorization", "value": "={{ 'Basic ' + $env[\"NTFY_BASE64_CREDENTIALS\"] }}" }, { "name": "Content-Type", "value": "application/json" } ] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  {\n    \"topic\": \"homelab-approve\",\n    \"title\": \"🚫 [REJECTED] \" + (($('Webhook Receive Decision').first().json.query?.action || 'ACTION').toUpperCase()) + \" \" + ($('Webhook Receive Decision').first().json.query?.target || ''),\n    \"priority\": 3,\n    \"tags\": [\"no_entry\", \"robot\"],\n    \"message\": \"Confirmed: Command was REJECTED by the user. No tasks were executed.\\nTarget: \" + ($('Webhook Receive Decision').first().json.query?.target || '')\n  }\n}}",
+        "options": {}
+      },
+      "id": "a2eed5d0-d3eb-414e-ab8d-9ee5f2c67376",
+      "name": "Send Ntfy Reject",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [ 592, 1168 ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json;\nconst q = raw.query || raw.body || raw;\nconst clean = (val) => String(val || '').replace(/^=/, '').trim();\n\nconst cleanQuery = {\n  execution_id: clean(q.execution_id),\n  action: clean(q.action) || 'restart',\n  target: clean(q.target),\n  asset_type: clean(q.asset_type) || 'container',\n  vmid: clean(q.vmid),\n  node_ip: clean(q.node_ip) || $env.get('N8N_LOCAL_IP'),\n  node_name: clean(q.node_name) || 'pve',\n  pve_token: clean(q.pve_token),\n  decision: clean(q.decision) || 'approve'\n};\n\nreturn [{ json: { query: cleanQuery } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [ -128, 992 ],
+      "id": "8024bbd7-a8e8-42ec-9dc1-0fefc8b1b778",
+      "name": "Clean Input"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook Receive Decision": { "main": [ [ { "node": "Clean Input", "type": "main", "index": 0 } ] ] },
+    "Approve Or Reject?": { "main": [ [ { "node": "Dynamic Action Router", "type": "main", "index": 0 } ], [ { "node": "Save Audit Log Reject", "type": "main", "index": 0 } ] ] },
+    "Dynamic Action Router": { "main": [ [ { "node": "Start QEMU VM Proxmox", "type": "main", "index": 0 } ], [ { "node": "Start LXC Proxmox", "type": "main", "index": 0 } ], [ { "node": "Execute Docker API", "type": "main", "index": 0 } ] ] },
+    "Start QEMU VM Proxmox": { "main": [ [ { "node": "Wait 10s Verification", "type": "main", "index": 0 } ] ] },
+    "Start LXC Proxmox": { "main": [ [ { "node": "Wait 10s Verification", "type": "main", "index": 0 } ] ] },
+    "Execute Docker API": { "main": [ [ { "node": "Wait 10s Verification", "type": "main", "index": 0 } ] ] },
+    "Wait 10s Verification": { "main": [ [ { "node": "Health Check", "type": "main", "index": 0 } ] ] },
+    "Health Check": { "main": [ [ { "node": "Save Audit Log", "type": "main", "index": 0 } ] ] },
+    "Save Audit Log": { "main": [ [ { "node": "Save RAG Memory", "type": "main", "index": 0 } ] ] },
+    "Save RAG Memory": { "main": [ [ { "node": "Send Ntfy Approve Result", "type": "main", "index": 0 } ] ] },
+    "Save Audit Log Reject": { "main": [ [ { "node": "Send Ntfy Reject", "type": "main", "index": 0 } ] ] },
+    "Clean Input": { "main": [ [ { "node": "Approve Or Reject?", "type": "main", "index": 0 } ] ] }
+  },
+  "active": true,
+  "settings": { "executionOrder": "v1" }
+}

@@ -1,0 +1,62 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+
+rule_files:
+  - "rules/*.yml" 
+
+scrape_configs:
+  # === 1. GIÁM SÁT MÁY CHỦ VẬT LÝ / VM / LXC ===
+  - job_name: 'node-exporter'
+    static_configs:
+      # Ví dụ mẫu: Người dùng thay thế IP bên dưới bằng IP máy chủ của họ
+      - targets: ['<SERVER_IP>:9100']
+        labels: { alias: '🖥️ Proxmox Host', container: 'pve' }
+      - targets: ['<APP_SERVER_IP>:9100']
+        labels: { alias: '📦 App Host', container: 'docker-core' }
+
+  # === 2. KIỂM TRA UPTIME DỊCH VỤ WEB (HTTP) ===
+  - job_name: 'blackbox'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets: ['http://<APP_SERVER_IP>:5678']
+        labels: { alias: '🤖 n8n Workflow', container: 'n8n' }
+      - targets: ['http://<APP_SERVER_IP>:3000']
+        labels: { alias: '📊 Metabase BI', container: 'metabase' } 
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  # === 3. KIỂM TRA DỊCH VỤ CHẠY NGẦM (TCP) ===
+  - job_name: 'blackbox-tcp'
+    metrics_path: /probe
+    params:
+      module: [tcp_connect]
+    static_configs:
+      - targets: ['<APP_SERVER_IP>:5432']
+        labels: { alias: '🗄️ PostgreSQL Database', container: 'postgres' }
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  # === 4. CADVISOR METRICS ===
+  - job_name: cadvisor
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['<APP_SERVER_IP>:8080']
+        labels: { alias: 'docker-core', container: 'docker-core' }
